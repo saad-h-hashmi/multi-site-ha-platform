@@ -8,6 +8,15 @@ The original assignment brief and project specification are preserved in [PROJEC
 
 ---
 
+## Project team
+
+Group project, University of Lahore. Submitted 21 November 2026.
+
+| Name | Registration number |
+|---|---|
+| Saad Hussain Hashmi | 70154663 |
+| Sadia Alla Dita | 70154570 |
+
 ## What is built
 
 ```mermaid
