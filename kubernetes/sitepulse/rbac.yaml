@@ -1,0 +1,40 @@
+# Least privilege: the app may only read pods in its own namespace (to show the
+# replica table). It cannot see Secrets, other namespaces, or change anything.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sitepulse
+  namespace: sitepulse
+  labels: { app.kubernetes.io/name: sitepulse }
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: sitepulse-pod-reader
+  namespace: sitepulse
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: sitepulse-pod-reader
+  namespace: sitepulse
+subjects:
+  - kind: ServiceAccount
+    name: sitepulse
+    namespace: sitepulse
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: sitepulse-pod-reader
+---
+# Redis needs no Kubernetes API access at all.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: redis
+  namespace: sitepulse
+automountServiceAccountToken: false

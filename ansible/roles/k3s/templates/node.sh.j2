@@ -6,4 +6,4 @@ set -e
 # All off-site traffic leaves through this site's router.
 ip route replace default via {{ node.site.router_lan_ip }}
 printf 'nameserver {{ dns.ip }}\nsearch {{ dns.zone }}\n' > /etc/resolv.conf
-exec /bin/k3s {{ node.role }} --config /lab/config.yaml
+exec /bin/k3s "$@" --config /lab/config.yaml   # "$@" = server | agent

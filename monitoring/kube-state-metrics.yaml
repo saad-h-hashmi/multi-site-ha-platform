@@ -1,0 +1,76 @@
+# kube-state-metrics turns Kubernetes object state (deployments, replicas, node
+# conditions) into metrics. Limited to the resources the dashboard uses.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kube-state-metrics
+  namespace: monitoring
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: msha-kube-state-metrics
+rules:
+  - apiGroups: [""]
+    resources: [nodes, pods, services, persistentvolumeclaims, namespaces]
+    verbs: [list, watch]
+  - apiGroups: [apps]
+    resources: [deployments, statefulsets, daemonsets, replicasets]
+    verbs: [list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: msha-kube-state-metrics
+subjects:
+  - { kind: ServiceAccount, name: kube-state-metrics, namespace: monitoring }
+roleRef:
+  { apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: msha-kube-state-metrics }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kube-state-metrics
+  namespace: monitoring
+  labels: { app.kubernetes.io/name: kube-state-metrics }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app.kubernetes.io/name: kube-state-metrics } }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: kube-state-metrics }
+    spec:
+      serviceAccountName: kube-state-metrics
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        seccompProfile: { type: RuntimeDefault }
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference: { matchExpressions: [{ key: lab.example/role, operator: In, values: [agent] }] }
+      containers:
+        - name: kube-state-metrics
+          image: KSM_IMAGE
+          args:
+            - --resources=nodes,pods,services,persistentvolumeclaims,namespaces,deployments,statefulsets,daemonsets,replicasets
+          ports: [{ name: http, containerPort: 8080 }]
+          readinessProbe: { httpGet: { path: /readyz, port: 8081 }, periodSeconds: 10 }
+          livenessProbe: { httpGet: { path: /livez, port: 8081 }, periodSeconds: 20 }
+          resources:
+            requests: { cpu: 10m, memory: 32Mi }
+            limits: { memory: 96Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kube-state-metrics
+  namespace: monitoring
+spec:
+  selector: { app.kubernetes.io/name: kube-state-metrics }
+  ports: [{ name: http, port: 8080, targetPort: http }]

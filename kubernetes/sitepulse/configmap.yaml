@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sitepulse-config
+  namespace: sitepulse
+  labels: { app.kubernetes.io/name: sitepulse }
+data:
+  APP_NAME: "SitePulse"
+  WELCOME_MESSAGE: "Multi-Site, Fully Automated, Highly Available Platform"
+  REDIS_HOST: "redis.sitepulse.svc.cluster.local"   # service discovery through cluster DNS
+  REDIS_PORT: "6379"
+  # Enables POST /chaos/* so the failure tests can break a pod on purpose (lab only)
+  CHAOS_ENABLED: "true"

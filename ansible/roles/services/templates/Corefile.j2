@@ -1,7 +1,8 @@
 # Lab DNS (CoreDNS). Rendered by Ansible.
-# Authoritative for {{ dns.zone }}; everything else is forwarded upstream.
+# Authoritative for {{ dns.zone }} from a real zone file (SOA/NS/A records), so
+# unknown names get a proper NXDOMAIN. Everything else is forwarded upstream.
 {{ dns.zone }}:53 {
-    hosts /etc/coredns/lab.hosts {{ dns.zone }} {
+    file /etc/coredns/{{ dns.zone }}.zone {
         reload 10s
     }
     log

@@ -1,0 +1,17 @@
+# Monitoring stack. The grafana-admin Secret is created by Ansible, not stored in git.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: monitoring
+resources:
+  - kube-state-metrics.yaml
+  - prometheus.yaml
+  - grafana.yaml
+configMapGenerator:
+  - name: grafana-dashboards
+    files: [dashboards/platform.json]
+generatorOptions:
+  disableNameSuffixHash: true
+images:
+  - { name: PROMETHEUS_IMAGE, newName: prom/prometheus, newTag: v3.5.0 }
+  - { name: GRAFANA_IMAGE, newName: grafana/grafana, newTag: 12.2.0 }
+  - { name: KSM_IMAGE, newName: registry.k8s.io/kube-state-metrics/kube-state-metrics, newTag: v2.17.0 }

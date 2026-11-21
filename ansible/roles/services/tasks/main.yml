@@ -12,10 +12,16 @@
 # ---------------- Lab DNS -----------------------------------------------------
 - name: Render lab DNS configuration
   ansible.builtin.template:
-    src: "{{ item }}.j2"
-    dest: "{{ build_dir }}/dns/{{ item }}"
+    src: "{{ item.src }}"
+    dest: "{{ build_dir }}/dns/{{ item.dest }}"
     mode: "0644"
-  loop: [Corefile, lab.hosts]
+  loop:
+    - { src: Corefile.j2, dest: Corefile }
+    - { src: lab.zone.j2, dest: "{{ dns.zone }}.zone" }
+  loop_control: { label: "{{ item.dest }}" }
+  vars:
+    # serial only matters for zone transfers; derive it from the config so it is stable
+    zone_serial: "{{ (sites | to_json ~ edge | to_json ~ dns | to_json) | hash('md5') | int(base=16) % 2147483647 }}"
   register: dns_cfg
 
 - name: Run the lab DNS server
@@ -30,7 +36,7 @@
     networks: [{ name: "{{ wan.name }}", ipv4_address: "{{ dns.ip }}" }]
     networks_cli_compatible: true
     labels: { project: "{{ project_name }}", role: dns }
-    recreate: "{{ dns_cfg.results[0].changed }}"   # hosts file reloads by itself
+    recreate: "{{ dns_cfg.results[0].changed }}"   # the zone file reloads by itself
 
 # ---------------- Image registry ----------------------------------------------
 - name: Run the container image registry

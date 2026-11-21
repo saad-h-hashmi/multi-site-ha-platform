@@ -1,0 +1,68 @@
+---
+# Platform layer (namespaces, Traefik HA) and the SitePulse application.
+- name: Apply platform manifests (namespaces, Traefik HA)
+  ansible.builtin.command: kubectl apply -k {{ project_root }}/kubernetes/platform
+  environment: { KUBECONFIG: "{{ build_dir }}/kubeconfig" }
+  register: platform_apply
+  changed_when: "'configured' in platform_apply.stdout or 'created' in platform_apply.stdout"
+
+- name: Build the SitePulse image
+  community.docker.docker_image_build:
+    name: "{{ app.image }}"
+    tag: "{{ app.version }}"
+    path: "{{ project_root }}/app/sitepulse"
+    args: { APP_VERSION: "{{ app.version }}" }
+    rebuild: always            # cheap; the build cache makes unchanged builds instant
+  register: app_build
+
+- name: Push the SitePulse image to the lab registry
+  community.docker.docker_image_push:
+    name: "{{ app.image }}"
+    tag: "{{ app.version }}"
+  register: app_push
+
+- name: Create or update the Redis password Secret (value from .secrets/)
+  ansible.builtin.shell: |
+    set -o pipefail
+    kubectl -n sitepulse create secret generic redis-auth \
+      --from-file=password={{ secrets_dir }}/redis-password \
+      --dry-run=client -o yaml | kubectl apply -f -
+  args: { executable: /bin/bash }
+  environment: { KUBECONFIG: "{{ build_dir }}/kubeconfig" }
+  register: redis_secret
+  changed_when: "'configured' in redis_secret.stdout or 'created' in redis_secret.stdout"
+
+- name: Apply the SitePulse application
+  ansible.builtin.command: kubectl apply -k {{ project_root }}/kubernetes/sitepulse
+  environment: { KUBECONFIG: "{{ build_dir }}/kubeconfig" }
+  register: app_apply
+  changed_when: "'configured' in app_apply.stdout or 'created' in app_apply.stdout"
+
+- name: Restart SitePulse pods when a new image was pushed with the same tag
+  ansible.builtin.command: kubectl -n sitepulse rollout restart deployment/sitepulse
+  environment: { KUBECONFIG: "{{ build_dir }}/kubeconfig" }
+  when: app_push is changed and 'created' not in app_apply.stdout
+
+- name: Wait for Redis and SitePulse to become ready
+  ansible.builtin.command: kubectl -n sitepulse rollout status {{ item }} --timeout=300s
+  environment: { KUBECONFIG: "{{ build_dir }}/kubeconfig" }
+  loop: [statefulset/redis, deployment/sitepulse]
+  changed_when: false
+
+- name: Wait for Traefik to run two replicas
+  ansible.builtin.command: kubectl -n kube-system rollout status deployment/traefik --timeout=300s
+  environment: { KUBECONFIG: "{{ build_dir }}/kubeconfig" }
+  register: traefik_rollout
+  until: traefik_rollout.rc == 0
+  retries: 5
+  delay: 10
+  changed_when: false
+
+- name: Wait until the application answers through the edge load balancer
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ edge.http_port }}/healthz"
+    status_code: 200
+  register: edge_app
+  until: edge_app.status == 200
+  retries: 30
+  delay: 3

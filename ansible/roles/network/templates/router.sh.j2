@@ -60,7 +60,7 @@ iptables -A FORWARD -p icmp -j ACCEPT
 # Site <-> site (over wg0): only the ports the Kubernetes cluster needs
 iptables -N SITE_TO_SITE
 iptables -A SITE_TO_SITE -p tcp --dport 6443 -m comment --comment "K3s API / supervisor" -j ACCEPT
-iptables -A SITE_TO_SITE -p tcp --dport 2379:2380 -m comment --comment "etcd client+peer" -j ACCEPT
+iptables -A SITE_TO_SITE -p tcp --dport 2379:2381 -m comment --comment "etcd client, peer, metrics" -j ACCEPT
 iptables -A SITE_TO_SITE -p tcp --dport 10250 -m comment --comment "kubelet" -j ACCEPT
 iptables -A SITE_TO_SITE -p udp --dport 8472 -m comment --comment "Flannel VXLAN" -j ACCEPT
 iptables -A SITE_TO_SITE -m comment --comment "deny other inter-site traffic" -j DROP

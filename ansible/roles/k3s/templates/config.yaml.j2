@@ -38,6 +38,7 @@ write-kubeconfig-mode: "0600"
 secrets-encryption: true         # Kubernetes Secrets are encrypted at rest in etcd
 etcd-snapshot-schedule-cron: "0 */6 * * *"
 etcd-snapshot-retention: 4
+etcd-expose-metrics: true        # etcd metrics on <node-ip>:2381 for Prometheus (quorum/leader)
 etcd-arg:
   # 2 shared vCPUs: relax etcd timing so CPU contention does not cause false elections
   - heartbeat-interval=500

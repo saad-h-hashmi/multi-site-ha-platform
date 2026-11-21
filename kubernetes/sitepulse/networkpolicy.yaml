@@ -1,0 +1,44 @@
+# Default-deny inbound traffic in the app namespace, then allow only what is
+# needed. K3s enforces NetworkPolicy with its embedded kube-router controller.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: sitepulse
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: sitepulse-allow-ingress-and-monitoring
+  namespace: sitepulse
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: sitepulse }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: kube-system }   # Traefik
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: monitoring }    # Prometheus
+      ports:
+        - { port: 8000, protocol: TCP }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: redis-allow-sitepulse-only
+  namespace: sitepulse
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: redis }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: { app.kubernetes.io/name: sitepulse }
+      ports:
+        - { port: 6379, protocol: TCP }

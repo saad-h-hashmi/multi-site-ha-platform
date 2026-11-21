@@ -1,0 +1,9 @@
+---
+# Phase 8: Prometheus, kube-state-metrics, Grafana.
+#   make monitoring
+- name: Deploy monitoring
+  hosts: lab-host
+  gather_facts: false
+  roles:
+    - secrets
+    - monitoring

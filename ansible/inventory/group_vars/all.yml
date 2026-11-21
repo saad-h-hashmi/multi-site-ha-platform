@@ -106,3 +106,6 @@ app:
   in_cluster_image: "{{ registry.ip }}:5000/sitepulse"
   version: "1.0.0"
   hostname: sitepulse.lab.internal
+
+# In-cluster images (Redis, Prometheus, Grafana, kube-state-metrics) are pinned in
+# the kustomization.yaml files under kubernetes/ and monitoring/.

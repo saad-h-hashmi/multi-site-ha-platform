@@ -1,0 +1,30 @@
+# K3s installs Traefik with a single replica. That would make ingress a single
+# point of failure, so run two replicas in different sites and protect them with
+# a PodDisruptionBudget. K3s's Helm controller merges these values into its chart.
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: traefik
+  namespace: kube-system
+spec:
+  valuesContent: |-
+    deployment:
+      replicas: 2
+    podDisruptionBudget:
+      enabled: true
+      minAvailable: 1
+    topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: DoNotSchedule
+        nodeTaintsPolicy: Honor
+        labelSelector:
+          matchLabels:
+            app.kubernetes.io/name: traefik
+    resources:
+      requests: { cpu: 25m, memory: 48Mi }
+      limits: { memory: 128Mi }
+    tolerations:
+      # leave a failed node quickly so the surviving replica is not alone for long
+      - { key: node.kubernetes.io/unreachable, operator: Exists, effect: NoExecute, tolerationSeconds: 30 }
+      - { key: node.kubernetes.io/not-ready, operator: Exists, effect: NoExecute, tolerationSeconds: 30 }

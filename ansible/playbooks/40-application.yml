@@ -1,0 +1,9 @@
+---
+# Phase 6: platform layer + SitePulse demo application.
+#   make app
+- name: Deploy the platform layer and the demo application
+  hosts: lab-host
+  gather_facts: false
+  roles:
+    - secrets
+    - platform

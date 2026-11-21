@@ -28,7 +28,7 @@
     hostname: "{{ node.name }}"
     image: "{{ k3s_image }}"
     entrypoint: ["/bin/sh", "/lab/node.sh"]
-    command: []
+    command: ["{{ node.role }}"]   # must match what Docker stores, or every run recreates the node
     privileged: true               # required for Kubernetes-in-Docker (cgroups, iptables, mounts)
     restart_policy: unless-stopped
     memory: "{{ k8s.server_memory if node.role == 'server' else k8s.agent_memory }}"
@@ -36,6 +36,8 @@
     volumes:
       - "{{ build_dir }}/nodes/{{ node.name }}:/lab:ro"
       - "{{ project_name }}-{{ node.name }}-data:/var/lib/rancher/k3s"
+      # node identity (join password); losing it makes the servers reject the node
+      - "{{ project_name }}-{{ node.name }}-identity:/etc/rancher/node"
     networks:
       - name: "{{ project_name }}-{{ node.site.name }}-lan"
         ipv4_address: "{{ node.ip }}"

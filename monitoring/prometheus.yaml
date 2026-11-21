@@ -1,0 +1,210 @@
+# Prometheus: single replica, 2-day retention, small memory limit (see RESOURCE_PLAN.md).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prometheus
+  namespace: monitoring
+---
+# Read-only access to the objects Prometheus discovers, plus kubelet metrics.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: msha-prometheus
+rules:
+  - apiGroups: [""]
+    resources: [nodes, nodes/metrics, services, endpoints, pods]
+    verbs: [get, list, watch]
+  - apiGroups: [discovery.k8s.io]
+    resources: [endpointslices]
+    verbs: [get, list, watch]
+  - nonResourceURLs: [/metrics, /metrics/cadvisor]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: msha-prometheus
+subjects:
+  - { kind: ServiceAccount, name: prometheus, namespace: monitoring }
+roleRef:
+  { apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: msha-prometheus }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: monitoring
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 30s
+      scrape_timeout: 10s
+      evaluation_interval: 30s
+      external_labels: { lab: multi-site-ha }
+    rule_files: [/etc/prometheus/alerts.yml]
+    scrape_configs:
+      # Kubelet node metrics (node Ready status, pod counts) from all 6 nodes, across sites
+      - job_name: kubelet
+        scheme: https
+        tls_config: { insecure_skip_verify: true }        # kubelet serving certs are self-signed (lab)
+        authorization: { credentials_file: /var/run/secrets/kubernetes.io/serviceaccount/token }
+        kubernetes_sd_configs: [{ role: node }]
+        relabel_configs:
+          - { source_labels: [__meta_kubernetes_node_label_topology_kubernetes_io_zone], target_label: site }
+          - { source_labels: [__meta_kubernetes_node_name], target_label: node }
+      # Container CPU / memory (cAdvisor) per pod
+      - job_name: cadvisor
+        scheme: https
+        metrics_path: /metrics/cadvisor
+        tls_config: { insecure_skip_verify: true }
+        authorization: { credentials_file: /var/run/secrets/kubernetes.io/serviceaccount/token }
+        kubernetes_sd_configs: [{ role: node }]
+        relabel_configs:
+          - { source_labels: [__meta_kubernetes_node_label_topology_kubernetes_io_zone], target_label: site }
+          - { source_labels: [__meta_kubernetes_node_name], target_label: node }
+        metric_relabel_configs:
+          # keep only what the dashboard uses (saves memory and disk)
+          - source_labels: [__name__]
+            regex: container_(cpu_usage_seconds_total|memory_working_set_bytes)
+            action: keep
+      # etcd on each K3s server: leader, quorum, proposals
+      - job_name: etcd
+        kubernetes_sd_configs: [{ role: node }]
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_node_label_node_role_kubernetes_io_etcd]
+            regex: "true"
+            action: keep
+          - source_labels: [__meta_kubernetes_node_address_InternalIP]
+            target_label: __address__
+            replacement: "$1:2381"
+          - { source_labels: [__meta_kubernetes_node_label_topology_kubernetes_io_zone], target_label: site }
+          - { source_labels: [__meta_kubernetes_node_name], target_label: node }
+      # Deployment / replica / node state
+      - job_name: kube-state-metrics
+        static_configs: [{ targets: ["kube-state-metrics.monitoring.svc:8080"] }]
+      # Application pods (annotated prometheus.io/scrape=true)
+      - job_name: sitepulse
+        kubernetes_sd_configs: [{ role: pod, namespaces: { names: [sitepulse] } }]
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            regex: "true"
+            action: keep
+          - source_labels: [__meta_kubernetes_pod_ip, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            separator: ":"
+            target_label: __address__
+          - { source_labels: [__meta_kubernetes_pod_name], target_label: pod }
+          - { source_labels: [__meta_kubernetes_pod_node_name], target_label: node }
+      # Edge load balancer (HAProxy built-in exporter), outside the cluster on the WAN
+      - job_name: edge-haproxy
+        static_configs: [{ targets: ["172.30.0.100:8405"], labels: { site: wan } }]
+  alerts.yml: |
+    groups:
+      - name: platform
+        rules:
+          - alert: NodeNotReady
+            expr: kube_node_status_condition{condition="Ready",status="true"} == 0
+            for: 1m
+            labels: { severity: warning }
+            annotations: { summary: "Node {{ $labels.node }} is not Ready" }
+          - alert: EtcdMemberDown
+            expr: up{job="etcd"} == 0
+            for: 1m
+            labels: { severity: warning }
+            annotations: { summary: "etcd member on {{ $labels.node }} is down (quorum at risk)" }
+          - alert: EtcdNoLeader
+            expr: etcd_server_has_leader == 0
+            for: 30s
+            labels: { severity: critical }
+            annotations: { summary: "etcd member on {{ $labels.node }} has no leader" }
+          - alert: SitePulseReplicasDegraded
+            expr: kube_deployment_status_replicas_available{deployment="sitepulse"} < kube_deployment_spec_replicas{deployment="sitepulse"}
+            for: 1m
+            labels: { severity: warning }
+            annotations: { summary: "SitePulse has fewer available replicas than desired" }
+          - alert: EdgeBackendDown
+            expr: haproxy_server_status{proxy="ingress_app",state="DOWN"} == 1
+            for: 1m
+            labels: { severity: info }
+            annotations: { summary: "Edge backend {{ $labels.server }} is DOWN" }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: prometheus-data
+  namespace: monitoring
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-path
+  resources: { requests: { storage: 1Gi } }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: monitoring
+  labels: { app.kubernetes.io/name: prometheus }
+spec:
+  replicas: 1
+  strategy: { type: Recreate }          # RWO volume: never two pods at once
+  selector: { matchLabels: { app.kubernetes.io/name: prometheus } }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: prometheus }
+    spec:
+      serviceAccountName: prometheus
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        fsGroup: 65534
+        seccompProfile: { type: RuntimeDefault }
+      affinity:
+        nodeAffinity:   # prefer agents, keeping the servers' CPU for etcd/API
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference: { matchExpressions: [{ key: lab.example/role, operator: In, values: [agent] }] }
+      containers:
+        - name: prometheus
+          image: PROMETHEUS_IMAGE
+          args:
+            - --config.file=/etc/prometheus/prometheus.yml
+            - --storage.tsdb.path=/prometheus
+            - --storage.tsdb.retention.time=2d
+            - --storage.tsdb.retention.size=600MB
+            - --web.enable-lifecycle
+          ports: [{ name: http, containerPort: 9090 }]
+          readinessProbe: { httpGet: { path: /-/ready, port: http }, periodSeconds: 10 }
+          livenessProbe: { httpGet: { path: /-/healthy, port: http }, periodSeconds: 20, failureThreshold: 6 }
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { memory: 384Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: config, mountPath: /etc/prometheus }
+            - { name: data, mountPath: /prometheus }
+      volumes:
+        - { name: config, configMap: { name: prometheus-config } }
+        - { name: data, persistentVolumeClaim: { claimName: prometheus-data } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: monitoring
+spec:
+  selector: { app.kubernetes.io/name: prometheus }
+  ports: [{ name: http, port: 9090, targetPort: http }]
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: prometheus
+  namespace: monitoring
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: prometheus.lab.internal
+      http:
+        paths: [{ path: /, pathType: Prefix, backend: { service: { name: prometheus, port: { name: http } } } }]
