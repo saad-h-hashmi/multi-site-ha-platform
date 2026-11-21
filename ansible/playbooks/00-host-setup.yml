@@ -1,0 +1,11 @@
+---
+# Host preparation. This is the ONLY step that needs sudo:
+#   make bootstrap        (asks for your sudo password once)
+# It is idempotent: running it again changes nothing if the host is already prepared.
+- name: Prepare the Ubuntu lab host
+  hosts: lab-host
+  become: true
+  vars:
+    lab_user: "{{ lookup('env', 'SUDO_USER') | default(lookup('env', 'USER'), true) }}"
+  roles:
+    - host_setup

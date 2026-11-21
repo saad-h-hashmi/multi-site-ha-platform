@@ -1,0 +1,23 @@
+# Example local overrides. Copy to config/lab.yml (git-ignored) and edit.
+#   cp config/lab.example.yml config/lab.yml
+# The Makefile loads config/lab.yml automatically when it exists.
+# No secrets belong here: secrets are generated into .secrets/ on first deploy.
+
+# Publish edge services only on the VM itself (not reachable from Windows):
+# edge:
+#   ip: 172.30.0.100
+#   bind_address: 127.0.0.1
+#   http_port: 8080
+#   api_port: 6443
+#   stats_port: 8404
+#   grafana_port: 3000
+#   prometheus_port: 9090
+
+# Give the nodes more or less memory:
+# k8s:
+#   cluster_cidr: 10.42.0.0/16
+#   service_cidr: 10.43.0.0/16
+#   cluster_dns: 10.43.0.10
+#   flannel_mtu: 1370
+#   server_memory: 1400m
+#   agent_memory: 900m

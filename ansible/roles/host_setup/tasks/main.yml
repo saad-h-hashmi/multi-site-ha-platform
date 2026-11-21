@@ -1,0 +1,75 @@
+---
+- name: Install only the packages this lab actually needs
+  ansible.builtin.apt:
+    name:
+      - docker.io            # container runtime that hosts every simulated node
+      - docker-buildx        # BuildKit builder for the demo application image
+      - python3-docker       # lets Ansible's community.docker modules talk to Docker
+      - wireguard-tools      # `wg` CLI, used to generate site-to-site tunnel keys
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Limit Docker log size (disk on this VM is small)
+  ansible.builtin.copy:
+    dest: /etc/docker/daemon.json
+    content: |
+      {
+        "log-driver": "json-file",
+        "log-opts": { "max-size": "10m", "max-file": "2" }
+      }
+    mode: "0644"
+    force: false            # never overwrite an existing Docker configuration
+  notify: Restart docker
+
+- name: Enable and start Docker
+  ansible.builtin.systemd_service:
+    name: docker
+    enabled: true
+    state: started
+
+- name: Allow {{ lab_user }} to use Docker without sudo
+  ansible.builtin.user:
+    name: "{{ lab_user }}"
+    groups: docker
+    append: true
+
+- name: Load kernel modules needed by WireGuard and Kubernetes networking
+  community.general.modprobe:
+    name: "{{ item }}"
+    state: present
+    persistent: present
+  loop: [wireguard, br_netfilter, overlay, vxlan]
+
+- name: Raise inotify limits (six kubelets share one kernel)
+  ansible.posix.sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    sysctl_file: /etc/sysctl.d/90-multi-site-ha.conf
+    reload: true
+  loop:
+    - { key: fs.inotify.max_user_instances, value: "1024" }
+    - { key: fs.inotify.max_user_watches, value: "524288" }
+
+- name: Check installed kubectl version
+  ansible.builtin.command: /usr/local/bin/kubectl version --client -o json
+  register: kubectl_check
+  changed_when: false
+  failed_when: false
+
+- name: Install kubectl {{ kubectl_version }}
+  when: kubectl_check.rc != 0 or (kubectl_check.stdout | from_json).clientVersion.gitVersion != kubectl_version
+  block:
+    - name: Download kubectl checksum
+      ansible.builtin.uri:
+        url: "https://dl.k8s.io/release/{{ kubectl_version }}/bin/linux/amd64/kubectl.sha256"
+        return_content: true
+      register: kubectl_sha
+
+    - name: Download kubectl binary (verified with checksum)
+      ansible.builtin.get_url:
+        url: "https://dl.k8s.io/release/{{ kubectl_version }}/bin/linux/amd64/kubectl"
+        dest: /usr/local/bin/kubectl
+        mode: "0755"
+        checksum: "sha256:{{ kubectl_sha.content | trim }}"
+        force: true

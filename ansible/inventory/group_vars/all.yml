@@ -1,0 +1,108 @@
+---
+# =============================================================================
+# Single source of truth for the lab topology.
+# Every playbook, template and test reads these values. Override any of them in
+# config/lab.yml (copy config/lab.example.yml); that file is git-ignored.
+# =============================================================================
+
+project_name: msha                      # prefix for every Docker object we create
+project_root: "{{ playbook_dir | dirname | dirname }}"
+build_dir: "{{ project_root }}/build"    # rendered runtime config (git-ignored)
+secrets_dir: "{{ project_root }}/.secrets"  # generated secrets (git-ignored, mode 0700)
+
+# ---- Software versions (pinned for reproducibility) -------------------------
+k3s_version: v1.37.2+k3s1
+k3s_image: "rancher/k3s:{{ k3s_version | replace('+', '-') }}"
+kubectl_version: v1.37.2
+router_image: alpine:3.22
+haproxy_image: haproxy:3.2-alpine
+coredns_image: coredns/coredns:1.12.4
+registry_image: registry:3
+
+# ---- WAN / transit network ---------------------------------------------------
+# Models the provider network that connects the three sites. Only routers and
+# shared "edge" services attach to it; Kubernetes nodes never do.
+wan:
+  name: "{{ project_name }}-wan"
+  subnet: 172.30.0.0/24
+  gateway: 172.30.0.254                 # Docker bridge on the host (exit to internet)
+
+# WireGuard overlay used by the routers for encrypted site-to-site tunnels
+wireguard:
+  subnet: 10.255.0.0/24
+  port: 51820
+  mtu: 1420
+
+# ---- Sites -------------------------------------------------------------------
+# Each site is its own Docker bridge network (its own broadcast domain and IP
+# range) with a dedicated router container. Docker blocks traffic between
+# different bridges, so the ONLY path between sites is router -> WireGuard ->
+# router, which is exactly what we want to demonstrate and test.
+sites:
+  - id: a
+    name: site-a
+    description: "Site A (primary)"
+    lan_subnet: 10.10.10.0/24
+    lan_gateway_host: 10.10.10.254      # host-side bridge IP (management access only)
+    site_prefix: 10.10.0.0/16           # summary route advertised to other sites
+    router_lan_ip: 10.10.10.1
+    router_wan_ip: 172.30.0.11
+    router_wg_ip: 10.255.0.1
+    server_ip: 10.10.10.11
+    agent_ip: 10.10.10.21
+  - id: b
+    name: site-b
+    description: "Site B (secondary)"
+    lan_subnet: 10.20.20.0/24
+    lan_gateway_host: 10.20.20.254
+    site_prefix: 10.20.0.0/16
+    router_lan_ip: 10.20.20.1
+    router_wan_ip: 172.30.0.12
+    router_wg_ip: 10.255.0.2
+    server_ip: 10.20.20.11
+    agent_ip: 10.20.20.21
+  - id: c
+    name: site-c
+    description: "Site C (tertiary / quorum)"
+    lan_subnet: 10.30.30.0/24
+    lan_gateway_host: 10.30.30.254
+    site_prefix: 10.30.0.0/16
+    router_lan_ip: 10.30.30.1
+    router_wan_ip: 172.30.0.13
+    router_wg_ip: 10.255.0.3
+    server_ip: 10.30.30.11
+    agent_ip: 10.30.30.21
+
+# ---- Shared services on the WAN segment --------------------------------------
+edge:
+  ip: 172.30.0.100                      # HAProxy: API + application load balancer
+  bind_address: 0.0.0.0                 # host address to publish on (see docs/SECURITY.md)
+  http_port: 8080                       # host port -> demo application (Apache already owns :80)
+  api_port: 6443                        # host port -> Kubernetes API (via HAProxy)
+  stats_port: 8404                      # host port -> HAProxy statistics page
+  grafana_port: 3000                    # host port -> Grafana
+  prometheus_port: 9090                 # host port -> Prometheus
+dns:
+  ip: 172.30.0.53
+  zone: lab.internal
+registry:
+  ip: 172.30.0.50
+  host_port: 5000                       # published on 127.0.0.1 only (for docker push)
+
+# ---- Kubernetes ----------------------------------------------------------------
+k8s:
+  cluster_cidr: 10.42.0.0/16
+  service_cidr: 10.43.0.0/16
+  cluster_dns: 10.43.0.10
+  flannel_mtu: 1370                     # 1420 (WireGuard) - 50 (VXLAN header)
+  # memory ceilings for each node container (keeps the lab inside ~9 GB RAM)
+  server_memory: 1400m
+  agent_memory: 900m
+
+# ---- Demo application --------------------------------------------------------
+app:
+  name: sitepulse
+  image: "localhost:{{ registry.host_port }}/sitepulse"
+  in_cluster_image: "{{ registry.ip }}:5000/sitepulse"
+  version: "1.0.0"
+  hostname: sitepulse.lab.internal

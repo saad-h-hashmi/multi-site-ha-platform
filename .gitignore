@@ -1,0 +1,23 @@
+# Generated secrets: NEVER commit
+.secrets/
+*.key
+*.pem
+
+# Rendered runtime configuration and kubeconfig (contains credentials)
+build/
+kubeconfig*
+
+# Local overrides (copy config/lab.example.yml -> config/lab.yml)
+config/lab.yml
+
+# Backups may contain cluster state and secrets
+backups/
+
+# Python / editor noise
+__pycache__/
+*.pyc
+.venv/
+.vscode/
+.idea/
+*.swp
+*.retry
