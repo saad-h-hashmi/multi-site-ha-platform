@@ -29,10 +29,12 @@ spec:
           whenUnsatisfiable: DoNotSchedule
           nodeTaintsPolicy: Honor      # ignore failed (tainted) sites when spreading
           labelSelector: { matchLabels: { app.kubernetes.io/name: sitepulse } }
+          matchLabelKeys: [pod-template-hash]   # count only this revision during rollouts
         - maxSkew: 1
           topologyKey: kubernetes.io/hostname
           whenUnsatisfiable: ScheduleAnyway
           labelSelector: { matchLabels: { app.kubernetes.io/name: sitepulse } }
+          matchLabelKeys: [pod-template-hash]   # count only this revision during rollouts
       tolerations:
         # Move pods off a failed node after 30 s (Kubernetes default is 300 s).
         - { key: node.kubernetes.io/unreachable, operator: Exists, effect: NoExecute, tolerationSeconds: 30 }

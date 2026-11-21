@@ -48,7 +48,11 @@ spec:
       affinity:
         nodeAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
+            # one preferred node: the images then exist on one node only (disk is
+            # tight); if that node fails the pod moves to any other node.
             - weight: 100
+              preference: { matchExpressions: [{ key: kubernetes.io/hostname, operator: In, values: [site-c-agent] }] }
+            - weight: 50
               preference: { matchExpressions: [{ key: lab.example/role, operator: In, values: [agent] }] }
       containers:
         - name: kube-state-metrics

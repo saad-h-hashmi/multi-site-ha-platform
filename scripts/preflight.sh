@@ -35,7 +35,7 @@ avail_mb=$(awk '/MemAvailable/{print int($2/1024)}' /proc/meminfo)
 disk_mb=$(df -Pm / | awk 'NR==2{print $4}')
 [ "$disk_mb" -ge 3500 ] && ok "free disk ${disk_mb} MB" || warn "free disk ${disk_mb} MB (lab wants ~3.5 GB free)"
 
-for p in 8080 6443 8404 3000 9090; do
+for p in 8080 6443 8404 9090; do
   if ss -Htln "sport = :$p" | grep -q . && ! docker ps --format '{{.Names}}' 2>/dev/null | grep -q '^msha-edge$'; then
     bad "host port $p already in use by another program"
   fi

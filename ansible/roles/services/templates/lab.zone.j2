@@ -10,7 +10,6 @@ registry    IN A {{ registry.ip }}
 edge        IN A {{ edge.ip }}
 api         IN A {{ edge.ip }}
 {{ app.hostname | replace('.' ~ dns.zone, '') }}   IN A {{ edge.ip }}
-grafana     IN A {{ edge.ip }}
 prometheus  IN A {{ edge.ip }}
 {% for s in sites %}
 

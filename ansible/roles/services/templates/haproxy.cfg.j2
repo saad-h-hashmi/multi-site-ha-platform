@@ -2,7 +2,6 @@
 # Edge load balancer (HAProxy). Rendered by Ansible; do not edit by hand.
 #  :6443  Kubernetes API   -> 3 K3s servers (one per site), TCP health checks
 #  :8080  SitePulse app    -> Traefik ingress on all 6 nodes, HTTP health checks
-#  :3000  Grafana          -> Traefik ingress (Host: grafana.{{ dns.zone }})
 #  :9090  Prometheus       -> Traefik ingress (Host: prometheus.{{ dns.zone }})
 #  :8404  statistics page (password protected)
 #  :8405  Prometheus metrics for HAProxy itself (lab-internal, not published)
@@ -59,13 +58,6 @@ frontend app_http
     option forwardfor
     default_backend ingress_app
 {{ ingress_backend('ingress_app', app.hostname, '/healthz') }}
-
-frontend grafana_http
-    bind :3000
-    mode http
-    option httplog
-    default_backend ingress_grafana
-{{ ingress_backend('ingress_grafana', 'grafana.' ~ dns.zone, '/api/health') }}
 
 frontend prometheus_http
     bind :9090

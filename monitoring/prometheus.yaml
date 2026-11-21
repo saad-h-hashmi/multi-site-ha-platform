@@ -89,6 +89,9 @@ data:
           - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
             regex: "true"
             action: keep
+          - source_labels: [__meta_kubernetes_pod_phase]   # ignore evicted/failed pod objects
+            regex: Running
+            action: keep
           - source_labels: [__meta_kubernetes_pod_ip, __meta_kubernetes_pod_annotation_prometheus_io_port]
             separator: ":"
             target_label: __address__
@@ -160,7 +163,11 @@ spec:
       affinity:
         nodeAffinity:   # prefer agents, keeping the servers' CPU for etcd/API
           preferredDuringSchedulingIgnoredDuringExecution:
+            # one preferred node: the images then exist on one node only (disk is
+            # tight); if that node fails the pod moves to any other node.
             - weight: 100
+              preference: { matchExpressions: [{ key: kubernetes.io/hostname, operator: In, values: [site-c-agent] }] }
+            - weight: 50
               preference: { matchExpressions: [{ key: lab.example/role, operator: In, values: [agent] }] }
       containers:
         - name: prometheus
@@ -169,7 +176,7 @@ spec:
             - --config.file=/etc/prometheus/prometheus.yml
             - --storage.tsdb.path=/prometheus
             - --storage.tsdb.retention.time=2d
-            - --storage.tsdb.retention.size=600MB
+            - --storage.tsdb.retention.size=300MB
             - --web.enable-lifecycle
           ports: [{ name: http, containerPort: 9090 }]
           readinessProbe: { httpGet: { path: /-/ready, port: http }, periodSeconds: 10 }

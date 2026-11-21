@@ -1,20 +1,10 @@
 ---
-# Lightweight monitoring: Prometheus + kube-state-metrics + Grafana.
+# Lightweight monitoring: Prometheus + kube-state-metrics.
+# (Grafana was evaluated and removed for disk reasons; see AD-11.)
 - name: Ensure the monitoring namespace exists
   ansible.builtin.command: kubectl apply -k {{ project_root }}/kubernetes/platform
   environment: { KUBECONFIG: "{{ build_dir }}/kubeconfig" }
   changed_when: false
-
-- name: Create or update the Grafana admin Secret (value from .secrets/)
-  ansible.builtin.shell: |
-    set -o pipefail
-    kubectl -n monitoring create secret generic grafana-admin \
-      --from-file=password={{ secrets_dir }}/grafana-admin-password \
-      --dry-run=client -o yaml | kubectl apply -f -
-  args: { executable: /bin/bash }
-  environment: { KUBECONFIG: "{{ build_dir }}/kubeconfig" }
-  register: grafana_secret
-  changed_when: "'configured' in grafana_secret.stdout or 'created' in grafana_secret.stdout"
 
 - name: Apply the monitoring stack
   ansible.builtin.command: kubectl apply -k {{ project_root }}/monitoring
@@ -27,22 +17,17 @@
   environment: { KUBECONFIG: "{{ build_dir }}/kubeconfig" }
   when: "'configmap/prometheus-config configured' in mon_apply.stdout"
 
-- name: Restart Grafana when its dashboards or provisioning changed
-  ansible.builtin.command: kubectl -n monitoring rollout restart deployment/grafana
-  environment: { KUBECONFIG: "{{ build_dir }}/kubeconfig" }
-  when: "'configmap/grafana-dashboards configured' in mon_apply.stdout or 'configmap/grafana-provisioning configured' in mon_apply.stdout or grafana_secret is changed"
-
 - name: Wait for the monitoring stack
   ansible.builtin.command: kubectl -n monitoring rollout status deployment/{{ item }} --timeout=600s
   environment: { KUBECONFIG: "{{ build_dir }}/kubeconfig" }
-  loop: [kube-state-metrics, prometheus, grafana]
+  loop: [kube-state-metrics, prometheus]
   changed_when: false
 
-- name: Wait until Grafana answers through the edge load balancer
+- name: Wait until Prometheus answers through the edge load balancer
   ansible.builtin.uri:
-    url: "http://127.0.0.1:{{ edge.grafana_port }}/api/health"
+    url: "http://127.0.0.1:{{ edge.prometheus_port }}/-/ready"
     status_code: 200
-  register: edge_grafana
-  until: edge_grafana.status == 200
+  register: edge_prom
+  until: edge_prom.status == 200
   retries: 30
   delay: 4

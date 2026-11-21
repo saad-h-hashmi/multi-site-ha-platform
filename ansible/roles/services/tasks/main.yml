@@ -83,7 +83,6 @@
       - "{{ edge.bind_address }}:{{ edge.http_port }}:8080"
       - "{{ edge.bind_address }}:{{ edge.api_port }}:6443"
       - "{{ edge.bind_address }}:{{ edge.stats_port }}:8404"
-      - "{{ edge.bind_address }}:{{ edge.grafana_port }}:3000"
       - "127.0.0.1:{{ edge.prometheus_port }}:9090"
     networks: [{ name: "{{ wan.name }}", ipv4_address: "{{ edge.ip }}" }]
     networks_cli_compatible: true

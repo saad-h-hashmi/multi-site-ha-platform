@@ -10,7 +10,6 @@
 #   http_port: 8080
 #   api_port: 6443
 #   stats_port: 8404
-#   grafana_port: 3000
 #   prometheus_port: 9090
 
 # Give the nodes more or less memory:

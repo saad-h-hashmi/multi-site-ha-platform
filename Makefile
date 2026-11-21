@@ -47,5 +47,5 @@ app: ## Build, push and deploy the SitePulse application
 	$(PLAYBOOK) $(PB)/40-application.yml
 
 .PHONY: monitoring
-monitoring: ## Deploy Prometheus, kube-state-metrics and Grafana
+monitoring: ## Deploy Prometheus and kube-state-metrics
 	$(PLAYBOOK) $(PB)/50-monitoring.yml

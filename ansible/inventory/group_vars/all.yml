@@ -80,8 +80,7 @@ edge:
   http_port: 8080                       # host port -> demo application (Apache already owns :80)
   api_port: 6443                        # host port -> Kubernetes API (via HAProxy)
   stats_port: 8404                      # host port -> HAProxy statistics page
-  grafana_port: 3000                    # host port -> Grafana
-  prometheus_port: 9090                 # host port -> Prometheus
+  prometheus_port: 9090                 # host port -> Prometheus web UI (127.0.0.1 only)
 dns:
   ip: 172.30.0.53
   zone: lab.internal
@@ -107,5 +106,5 @@ app:
   version: "1.0.0"
   hostname: sitepulse.lab.internal
 
-# In-cluster images (Redis, Prometheus, Grafana, kube-state-metrics) are pinned in
+# In-cluster images (Redis, Prometheus, kube-state-metrics) are pinned in
 # the kustomization.yaml files under kubernetes/ and monitoring/.
