@@ -87,7 +87,10 @@ restore_etcd() {
   stable_api() { for i in 1 2 3 4 5; do kubectl --request-timeout=3s get --raw /readyz >/dev/null 2>&1 || return 1; sleep 1; done; }
   wait_for 300 stable_api
   trap - ERR
-  echo "  all 6 nodes Ready, API stable through the edge"
+  # K3s keeps the pre-restore database as db/etcd-old-<time>; remove it once the restore
+  # has succeeded (each copy is ~150-200 MB on a small disk)
+  docker exec $P-$first sh -c 'rm -rf /var/lib/rancher/k3s/server/db/etcd-old-* /var/lib/rancher/k3s/server/restore.db'
+  echo "  all 6 nodes Ready, API stable through the edge (pre-restore copies removed)"
 }
 
 case "$MODE" in
