@@ -1,0 +1,53 @@
+# K3s configuration for {{ node.name }} ({{ node.role }}, {{ node.site.description }}).
+# Rendered by Ansible from group_vars/all.yml. Do not edit by hand.
+node-name: {{ node.name }}
+node-ip: {{ node.ip }}
+flannel-iface: eth0
+token-file: /lab/token
+private-registry: /lab/registries.yaml
+node-label:
+  - topology.kubernetes.io/region=lab
+  - topology.kubernetes.io/zone={{ node.site.name }}
+  - lab.example/site={{ node.site.name }}
+  - lab.example/role={{ node.role }}
+kubelet-arg:
+  # The node containers share one 20 GB disk. Default image GC (85%) and eviction
+  # (15% free) thresholds would evict pods on this VM, so they are relaxed here.
+  - image-gc-high-threshold=95
+  - image-gc-low-threshold=90
+  - eviction-hard=memory.available<100Mi,nodefs.available<5%,imagefs.available<5%
+{% if node.role == 'server' %}
+{% if node.site.id == sites[0].id %}
+cluster-init: true               # first server bootstraps the embedded etcd cluster
+{% else %}
+server: https://{{ sites[0].server_ip }}:6443   # join the etcd cluster through server-{{ sites[0].id }}
+{% endif %}
+advertise-address: {{ node.ip }}
+cluster-cidr: {{ k8s.cluster_cidr }}
+service-cidr: {{ k8s.service_cidr }}
+cluster-dns: {{ k8s.cluster_dns }}
+tls-san:
+  - {{ edge.ip }}
+  - api.{{ dns.zone }}
+  - 127.0.0.1
+  - localhost
+{% if host_ip is defined and host_ip %}
+  - {{ host_ip }}
+{% endif %}
+write-kubeconfig-mode: "0600"
+secrets-encryption: true         # Kubernetes Secrets are encrypted at rest in etcd
+etcd-snapshot-schedule-cron: "0 */6 * * *"
+etcd-snapshot-retention: 4
+etcd-arg:
+  # 2 shared vCPUs: relax etcd timing so CPU contention does not cause false elections
+  - heartbeat-interval=500
+  - election-timeout=5000
+kube-controller-manager-arg:
+  - node-monitor-grace-period=20s   # mark an unreachable node NotReady after 20 s
+kube-apiserver-arg:
+  # evict pods from a failed node after 30 s instead of the default 300 s
+  - default-not-ready-toleration-seconds=30
+  - default-unreachable-toleration-seconds=30
+{% else %}
+server: https://{{ edge.ip }}:6443   # agents join through the edge load balancer
+{% endif %}

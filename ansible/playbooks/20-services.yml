@@ -1,0 +1,9 @@
+---
+# Shared services: lab DNS, image registry, edge load balancer.
+#   make services
+- name: Deploy shared services
+  hosts: lab-host
+  gather_facts: false
+  roles:
+    - secrets
+    - services

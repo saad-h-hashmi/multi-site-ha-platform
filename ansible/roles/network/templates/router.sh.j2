@@ -81,7 +81,11 @@ iptables -A FORWARD -i "$LAN_IF" -o "$WAN_IF" -d 10.0.0.0/8 -j DROP
 iptables -A FORWARD -i "$LAN_IF" -o "$WAN_IF" -d 172.16.0.0/12 -j DROP
 iptables -A FORWARD -i "$LAN_IF" -o "$WAN_IF" -d 192.168.0.0/16 -j DROP
 iptables -A FORWARD -i "$LAN_IF" -o "$WAN_IF" -j ACCEPT
-iptables -t nat -A POSTROUTING -s {{ site.lan_subnet }} -o "$WAN_IF" ! -d {{ wan.subnet }} -j MASQUERADE
+# Source-NAT everything a site sends onto the WAN (shared services and internet),
+# like a branch-office NAT gateway. Replies then return through this router, which
+# keeps the path symmetric. Site-to-site traffic over wg0 is NOT translated, so
+# etcd/Flannel see real node IPs; edge->site connections keep the client IP.
+iptables -t nat -A POSTROUTING -s {{ site.lan_subnet }} -o "$WAN_IF" -j MASQUERADE
 
 log "ready: $(wg show wg0 peers | wc -l) WireGuard peers, firewall loaded"
 

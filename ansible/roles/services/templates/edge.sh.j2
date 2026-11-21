@@ -1,0 +1,8 @@
+#!/bin/sh
+# Edge load balancer start-up. The edge sits on the WAN segment and reaches each
+# site through that site's router (like a cloud load balancer reaching sites).
+set -e
+{% for s in sites %}
+ip route replace {{ s.site_prefix }} via {{ s.router_wan_ip }}   # {{ s.description }}
+{% endfor %}
+exec haproxy -W -db -f /lab/haproxy.cfg

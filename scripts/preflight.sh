@@ -20,7 +20,7 @@ fi
 python3 -c 'import docker' 2>/dev/null && ok "python3-docker available" || bad "python3-docker missing"
 
 for m in wireguard br_netfilter overlay; do
-  lsmod | grep -q "^${m} " && ok "kernel module ${m} loaded" || bad "kernel module ${m} not loaded"
+  [ -d "/sys/module/${m}" ] && ok "kernel module ${m} loaded" || bad "kernel module ${m} not loaded"
 done
 
 inst=$(sysctl -n fs.inotify.max_user_instances)

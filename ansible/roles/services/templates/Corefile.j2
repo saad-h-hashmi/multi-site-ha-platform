@@ -1,0 +1,14 @@
+# Lab DNS (CoreDNS). Rendered by Ansible.
+# Authoritative for {{ dns.zone }}; everything else is forwarded upstream.
+{{ dns.zone }}:53 {
+    hosts /etc/coredns/lab.hosts {{ dns.zone }} {
+        reload 10s
+    }
+    log
+    errors
+}
+.:53 {
+    forward . 127.0.0.11      # Docker's resolver -> the VM's DNS -> internet
+    cache 60
+    errors
+}

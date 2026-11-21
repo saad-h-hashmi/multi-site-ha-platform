@@ -1,0 +1,58 @@
+---
+# Render config for, and start, one K3s node container. Included once per node.
+- name: "{{ node.name }} | config directory"
+  ansible.builtin.file:
+    path: "{{ build_dir }}/nodes/{{ node.name }}"
+    state: directory
+    mode: "0700"
+
+- name: "{{ node.name }} | render configuration"
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "{{ build_dir }}/nodes/{{ node.name }}/{{ item }}"
+    mode: "0600"
+  loop: [node.sh, config.yaml, registries.yaml]
+  register: node_cfg
+
+- name: "{{ node.name }} | cluster token"
+  ansible.builtin.copy:
+    content: "{{ k3s_token }}"
+    dest: "{{ build_dir }}/nodes/{{ node.name }}/token"
+    mode: "0600"
+  no_log: true
+  register: node_token
+
+- name: "{{ node.name }} | run node container"
+  community.docker.docker_container:
+    name: "{{ project_name }}-{{ node.name }}"
+    hostname: "{{ node.name }}"
+    image: "{{ k3s_image }}"
+    entrypoint: ["/bin/sh", "/lab/node.sh"]
+    command: []
+    privileged: true               # required for Kubernetes-in-Docker (cgroups, iptables, mounts)
+    restart_policy: unless-stopped
+    memory: "{{ k8s.server_memory if node.role == 'server' else k8s.agent_memory }}"
+    tmpfs: ["/run", "/var/run"]
+    volumes:
+      - "{{ build_dir }}/nodes/{{ node.name }}:/lab:ro"
+      - "{{ project_name }}-{{ node.name }}-data:/var/lib/rancher/k3s"
+    networks:
+      - name: "{{ project_name }}-{{ node.site.name }}-lan"
+        ipv4_address: "{{ node.ip }}"
+    networks_cli_compatible: true
+    labels:
+      project: "{{ project_name }}"
+      role: "k8s-{{ node.role }}"
+      site: "{{ node.site.name }}"
+    recreate: "{{ node_cfg is changed or node_token is changed }}"
+  register: node_container
+
+- name: "{{ node.name }} | wait until the node is Ready"
+  ansible.builtin.command: >
+    docker exec {{ project_name }}-{{ kubectl_via }} kubectl get node {{ node.name }}
+    -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}'
+  register: node_ready
+  until: node_ready.stdout == 'True'
+  retries: 60
+  delay: 5
+  changed_when: false

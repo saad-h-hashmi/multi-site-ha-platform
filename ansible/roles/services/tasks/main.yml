@@ -1,0 +1,85 @@
+---
+# Shared services on the WAN segment: lab DNS, image registry, edge load balancer.
+- name: Create service config directories
+  ansible.builtin.file:
+    path: "{{ build_dir }}/{{ item.dir }}"
+    state: directory
+    mode: "{{ item.mode }}"
+  loop:
+    - { dir: dns, mode: "0755" }   # CoreDNS runs as a non-root user; no secrets here
+    - { dir: edge, mode: "0700" }  # contains the stats password; read by root at start-up
+
+# ---------------- Lab DNS -----------------------------------------------------
+- name: Render lab DNS configuration
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "{{ build_dir }}/dns/{{ item }}"
+    mode: "0644"
+  loop: [Corefile, lab.hosts]
+  register: dns_cfg
+
+- name: Run the lab DNS server
+  community.docker.docker_container:
+    name: "{{ project_name }}-dns"
+    hostname: dns
+    image: "{{ coredns_image }}"
+    command: ["-conf", "/etc/coredns/Corefile"]
+    restart_policy: unless-stopped
+    memory: 64m
+    volumes: ["{{ build_dir }}/dns:/etc/coredns:ro"]
+    networks: [{ name: "{{ wan.name }}", ipv4_address: "{{ dns.ip }}" }]
+    networks_cli_compatible: true
+    labels: { project: "{{ project_name }}", role: dns }
+    recreate: "{{ dns_cfg.results[0].changed }}"   # hosts file reloads by itself
+
+# ---------------- Image registry ----------------------------------------------
+- name: Run the container image registry
+  community.docker.docker_container:
+    name: "{{ project_name }}-registry"
+    hostname: registry
+    image: "{{ registry_image }}"
+    restart_policy: unless-stopped
+    memory: 128m
+    env:
+      REGISTRY_STORAGE_DELETE_ENABLED: "true"
+    published_ports: ["127.0.0.1:{{ registry.host_port }}:5000"]
+    volumes: ["{{ project_name }}-registry-data:/var/lib/registry"]
+    networks: [{ name: "{{ wan.name }}", ipv4_address: "{{ registry.ip }}" }]
+    networks_cli_compatible: true
+    labels: { project: "{{ project_name }}", role: registry }
+
+# ---------------- Edge load balancer ------------------------------------------
+- name: Render edge load balancer configuration
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "{{ build_dir }}/edge/{{ item }}"
+    mode: "0600"
+  loop: [haproxy.cfg, edge.sh]
+  register: edge_cfg
+
+- name: Validate the HAProxy configuration
+  ansible.builtin.command: >
+    docker run --rm --user 0 -v {{ build_dir }}/edge:/lab:ro --entrypoint haproxy {{ haproxy_image }} -c -f /lab/haproxy.cfg
+  changed_when: false
+
+- name: Run the edge load balancer
+  community.docker.docker_container:
+    name: "{{ project_name }}-edge"
+    hostname: edge
+    image: "{{ haproxy_image }}"
+    entrypoint: ["/bin/sh", "/lab/edge.sh"]
+    user: root                      # needs NET_ADMIN for routes; HAProxy drops to 'haproxy' itself
+    capabilities: [NET_ADMIN]
+    restart_policy: unless-stopped
+    memory: 64m
+    volumes: ["{{ build_dir }}/edge:/lab:ro"]
+    published_ports:
+      - "{{ edge.bind_address }}:{{ edge.http_port }}:8080"
+      - "{{ edge.bind_address }}:{{ edge.api_port }}:6443"
+      - "{{ edge.bind_address }}:{{ edge.stats_port }}:8404"
+      - "{{ edge.bind_address }}:{{ edge.grafana_port }}:3000"
+      - "127.0.0.1:{{ edge.prometheus_port }}:9090"
+    networks: [{ name: "{{ wan.name }}", ipv4_address: "{{ edge.ip }}" }]
+    networks_cli_compatible: true
+    labels: { project: "{{ project_name }}", role: edge }
+    recreate: "{{ edge_cfg is changed }}"

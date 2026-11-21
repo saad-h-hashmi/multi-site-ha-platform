@@ -1,0 +1,12 @@
+# {{ dns.zone }} records. Rendered by Ansible from group_vars/all.yml.
+# Shared services (WAN segment)
+{{ edge.ip }}      edge.{{ dns.zone }} api.{{ dns.zone }} {{ app.hostname }} grafana.{{ dns.zone }} prometheus.{{ dns.zone }}
+{{ dns.ip }}       dns.{{ dns.zone }}
+{{ registry.ip }}       registry.{{ dns.zone }}
+{% for s in sites %}
+# {{ s.description }}
+{{ s.router_wan_ip }}       router-{{ s.id }}.{{ dns.zone }}
+{{ s.router_lan_ip }}        gw.{{ s.name }}.{{ dns.zone }}
+{{ s.server_ip }}       {{ s.name }}-server.{{ dns.zone }}
+{{ s.agent_ip }}       {{ s.name }}-agent.{{ dns.zone }}
+{% endfor %}

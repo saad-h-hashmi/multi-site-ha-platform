@@ -1,0 +1,91 @@
+# =============================================================================
+# Edge load balancer (HAProxy). Rendered by Ansible; do not edit by hand.
+#  :6443  Kubernetes API   -> 3 K3s servers (one per site), TCP health checks
+#  :8080  SitePulse app    -> Traefik ingress on all 6 nodes, HTTP health checks
+#  :3000  Grafana          -> Traefik ingress (Host: grafana.{{ dns.zone }})
+#  :9090  Prometheus       -> Traefik ingress (Host: prometheus.{{ dns.zone }})
+#  :8404  statistics page (password protected)
+#  :8405  Prometheus metrics for HAProxy itself (lab-internal, not published)
+# =============================================================================
+global
+    user haproxy
+    group haproxy
+    log stdout format raw local0 info
+    maxconn 2000
+
+defaults
+    log global
+    timeout connect 3s
+    timeout client  60s
+    timeout server  60s
+    timeout tunnel  1h          # long-lived kubectl watch/exec streams
+    default-server inter 2s fall 2 rise 2 on-marked-down shutdown-sessions
+
+# ---------------- Kubernetes API (TCP passthrough, TLS ends at K3s) -----------
+frontend k8s_api
+    bind :6443
+    mode tcp
+    option tcplog
+    default_backend k8s_api_servers
+
+backend k8s_api_servers
+    mode tcp
+    balance roundrobin
+    option tcp-check
+{% for s in sites %}
+    server {{ s.name }}-server {{ s.server_ip }}:6443 check
+{% endfor %}
+
+# ---------------- HTTP services through the Traefik ingress -------------------
+{% macro ingress_backend(name, host, check_path) %}
+backend {{ name }}
+    mode http
+    balance roundrobin
+    option httpchk
+    http-check send meth GET uri {{ check_path }} ver HTTP/1.1 hdr Host {{ host }}
+    http-check expect status 200
+    http-request set-header Host {{ host }}
+    http-response set-header X-Edge-Backend %s
+{% for s in sites %}
+    server {{ s.name }}-server {{ s.server_ip }}:80 check
+    server {{ s.name }}-agent  {{ s.agent_ip }}:80 check
+{% endfor %}
+{% endmacro %}
+
+frontend app_http
+    bind :8080
+    mode http
+    option httplog
+    option forwardfor
+    default_backend ingress_app
+{{ ingress_backend('ingress_app', app.hostname, '/healthz') }}
+
+frontend grafana_http
+    bind :3000
+    mode http
+    option httplog
+    default_backend ingress_grafana
+{{ ingress_backend('ingress_grafana', 'grafana.' ~ dns.zone, '/api/health') }}
+
+frontend prometheus_http
+    bind :9090
+    mode http
+    option httplog
+    default_backend ingress_prometheus
+{{ ingress_backend('ingress_prometheus', 'prometheus.' ~ dns.zone, '/-/healthy') }}
+
+# ---------------- Statistics and metrics --------------------------------------
+frontend stats
+    bind :8404
+    mode http
+    stats enable
+    stats uri /
+    stats refresh 5s
+    stats show-legends
+    stats auth admin:{{ haproxy_stats_password }}
+
+frontend metrics
+    bind :8405
+    mode http
+    http-request use-service prometheus-exporter if { path /metrics }
+    http-request return status 404 if !{ path /metrics }

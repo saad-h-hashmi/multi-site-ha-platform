@@ -1,0 +1,10 @@
+---
+# Phase 4: K3s cluster (3 servers with embedded etcd + 3 agents).
+#   make kubernetes
+- name: Deploy the K3s cluster
+  hosts: lab-host
+  gather_facts: true
+  gather_subset: [network]
+  roles:
+    - secrets
+    - k3s

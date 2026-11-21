@@ -1,0 +1,6 @@
+# containerd registry configuration: the lab registry speaks plain HTTP on the
+# private WAN segment (lab only; a real deployment would use TLS).
+mirrors:
+  "{{ registry.ip }}:5000":
+    endpoint:
+      - "http://{{ registry.ip }}:5000"
