@@ -1,0 +1,19 @@
+%% Failure and recovery workflow (node or site failure)
+sequenceDiagram
+  participant N as Failed node / site
+  participant E as Edge HAProxy
+  participant C as Controller manager
+  participant S as Scheduler
+  participant P as New pod (other site)
+  Note over N: t = 0 node stops (or its router is cut)
+  E->>N: health check fails twice (2 s interval)
+  E-->>E: t = 2-4 s backend DOWN, traffic to other nodes;<br/>in-flight failures retried (redispatch)
+  C->>N: no kubelet heartbeat
+  C-->>C: t = 20 s node NotReady, taint unreachable
+  C-->>C: t = 20+30 s toleration expires, pods evicted
+  S->>P: schedule replacement on a surviving site (zone spread)
+  P-->>E: t ~ 50-60 s readiness passes, back to 3 replicas
+  Note over N: node returns
+  N->>C: kubelet heartbeat, node Ready
+  N->>E: health check passes, backend UP
+  Note over S: replicas are NOT moved back automatically;<br/>a rollout restart rebalances them

@@ -1,0 +1,5 @@
+13s         Normal    Created     pod/sitepulse-587c85d6b9-sdpnf   Container created
+13s         Normal    Started     pod/sitepulse-587c85d6b9-sdpnf   Container started
+13s         Normal    Pulled      pod/sitepulse-587c85d6b9-sdpnf   Container image "172.30.0.50:5000/sitepulse:1.0.0" already present on machine and can be accessed by the pod
+13s         Warning   Unhealthy   pod/sitepulse-587c85d6b9-sdpnf   Readiness probe failed: Get "http://10.42.6.12:8000/readyz": dial tcp 10.42.6.12:8000: connect: connection refused
+9s          Warning   Unhealthy   pod/sitepulse-587c85d6b9-sdpnf   Startup probe failed: Get "http://10.42.6.12:8000/healthz": dial tcp 10.42.6.12:8000: connect: connection refused

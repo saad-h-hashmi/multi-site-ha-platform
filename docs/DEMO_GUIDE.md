@@ -16,7 +16,7 @@ The restart guarantees one replica per site at the start.
 ```bash
 docker ps --filter label=project=msha --format 'table {{.Names}}\t{{.Status}}'
 make net-status | less          # routes, WireGuard peers, firewall counters
-tests/test_network.sh           # 22 checks: routing path, firewall, isolation, DNS
+tests/test_network.sh           # 27 checks: routing path, firewall, isolation, DNS
 ```
 
 Points to make: each site has its own subnet and router; the routers are joined only by encrypted WireGuard tunnels; the traceroute check (NET-04) shows the real path; ISO-01 shows a site cannot bypass its router.

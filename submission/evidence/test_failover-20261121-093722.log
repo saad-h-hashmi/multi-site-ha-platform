@@ -1,0 +1,8 @@
+# suite=test_failover host=saad-VMware-Virtual-Platform started=2026-11-21T09:37:22-06:00
+FAIL|FO-01|deleted pod replaced, app stayed available (25/25 (100.0%))|0.02s
+    | 
+PASS|FO-02|kubelet restarted the unhealthy container (restarts 0 -> 1)|0.01s
+    | 
+PASS|FO-03|unready pod received no traffic (0/20) and app stayed up|0.01s
+    | 
+# finished=2026-11-21T09:38:42-06:00 pass=2 fail=1

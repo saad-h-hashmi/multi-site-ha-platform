@@ -1,0 +1,12 @@
+%% Deployment workflow (make deploy)
+flowchart TD
+  B0["make bootstrap (once, sudo)<br/>Docker, kubectl, WireGuard tools,<br/>kernel modules, sysctls"] --> D0
+  D0["make deploy = ansible-playbook site.yml"] --> S0["secrets role<br/>generate or reuse token, WireGuard keys, passwords in .secrets/"]
+  S0 --> N["10-network<br/>build router image, create WAN + 3 LANs,<br/>render router scripts, start routers, wait 'ready'"]
+  N --> SV["20-services<br/>lab DNS zone, registry,<br/>validate + start HAProxy edge"]
+  SV --> K["30-kubernetes<br/>server-a (cluster-init) -> wait Ready<br/>server-b -> wait, server-c -> wait<br/>agents -> wait, etcd /health x3, kubeconfigs"]
+  K --> AP["40-application<br/>namespaces, Traefik HA, CoreDNS x3,<br/>build + push SitePulse, Secret, kubectl apply -k,<br/>wait rollouts + edge /healthz"]
+  AP --> M["50-monitoring<br/>Prometheus + kube-state-metrics,<br/>wait ready via edge"]
+  M --> T["make test / make test-failover / make health"]
+  T --> R{"rerun make deploy?"}
+  R -->|"idempotent: changed=0"| T

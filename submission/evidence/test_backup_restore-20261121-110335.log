@@ -1,0 +1,44 @@
+# suite=test_backup_restore host=saad-VMware-Virtual-Platform started=2026-11-21T11:03:35-06:00
+PASS|BR-01|backup completes (etcd snapshot, Redis keys, secrets, manifests)|1.74s
+    | Backup -> backups/20261121-110335
+    |   etcd snapshot: etcd/msha-20261121-110335-site-a-server-1795280616 (24M) taken on site-a-server
+    |   redis keys: {"sitepulse:visits":"17"}
+    |   secrets: 6 files
+    |   kubernetes objects: k8s/sitepulse.yaml
+    | Done: backups/20261121-110335
+PASS|BR-02|backup contains an etcd snapshot and the counter value 17|0.02s
+    | total 23864
+    | -rw------- 1 saad saad 24432672 Nov 21 11:03 msha-20261121-110335-site-a-server-1795280616
+    | true
+PASS|BR-03|restore-data brings the counter back to 17|0.76s
+    | Restore 'data' from backups/20261121-110335
+    |   restored sitepulse:visits = 17
+    | Restore complete.
+    | now=17
+PASS|BR-04|marker object deleted after the backup (simulated operator mistake)|0.17s
+    | Error from server (NotFound): configmaps "msha-restore-marker" not found
+    | blocked as expected
+PASS|BR-05|full etcd restore (cluster-reset + rejoin) completes|42.98s
+    | Restore 'etcd' from backups/20261121-110335
+    |   1/5 stopping all K3s nodes
+    |   2/5 copying the snapshot into site-a-server and running 'k3s server --cluster-reset'
+    |   3/5 starting site-a-server (single-member etcd restored from the snapshot)
+    |   4/5 re-joining the other servers with empty etcd data
+    |       site-b-server rejoined
+    |       site-c-server rejoined
+    |   5/5 starting the agents
+    |   all 6 nodes Ready
+    | Restore complete.
+etcd_restore_seconds=43
+FAIL|BR-06|the deleted marker object is back (state rolled back to the snapshot)|0.17s
+    | Error from server (ServiceUnavailable): the server is currently unable to handle the request (get configmaps msha-restore-marker)
+PASS|BR-07|after restore: 3 healthy etcd members, 6 Ready nodes, app serving through the edge|31.40s
+    | Error from server (ServiceUnavailable): the server is currently unable to handle the request (get nodes)
+    | NAME            STATUS     ROLES                AGE    VERSION
+    | site-a-agent    Ready      <none>               132m   v1.37.2+k3s1
+    | site-a-server   Ready      control-plane,etcd   134m   v1.37.2+k3s1
+    | site-b-agent    Ready      <none>               132m   v1.37.2+k3s1
+    | site-b-server   Ready      control-plane,etcd   133m   v1.37.2+k3s1
+    | site-c-agent    NotReady   <none>               132m   v1.37.2+k3s1
+    | site-c-server   Ready      control-plane,etcd   133m   v1.37.2+k3s1
+# finished=2026-11-21T11:04:54-06:00 pass=6 fail=1

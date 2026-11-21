@@ -1,0 +1,11 @@
+%% IP addressing plan
+flowchart TB
+  ROOT["Address plan"]
+  ROOT --> S["Sites (/16 summaries)"]
+  S --> SA["10.10.0.0/16 Site A<br/>LAN 10.10.10.0/24<br/>.1 router  .11 server  .21 agent  .254 host bridge"]
+  S --> SB["10.20.0.0/16 Site B<br/>LAN 10.20.20.0/24<br/>.1 router  .11 server  .21 agent  .254 host bridge"]
+  S --> SC["10.30.0.0/16 Site C<br/>LAN 10.30.30.0/24<br/>.1 router  .11 server  .21 agent  .254 host bridge"]
+  ROOT --> W["WAN 172.30.0.0/24<br/>.11-.13 routers  .50 registry  .53 DNS  .100 edge  .254 gateway"]
+  ROOT --> O["WireGuard overlay 10.255.0.0/24<br/>.1 router-a  .2 router-b  .3 router-c"]
+  ROOT --> K["Kubernetes<br/>pods 10.42.0.0/16 (one /24 per node)<br/>services 10.43.0.0/16, DNS 10.43.0.10"]
+  ROOT --> V["Existing VMware NAT 192.168.30.0/24<br/>VM 192.168.30.128 (not managed by the lab)"]

@@ -1,0 +1,5 @@
+9s          Warning   Unhealthy     pod/sitepulse-5c4f7d49fc-945qx   Readiness probe failed: HTTP probe failed with statuscode: 503
+9s          Normal    Pulled        pod/sitepulse-5c4f7d49fc-945qx   Container image "172.30.0.50:5000/sitepulse:1.2.0" already present on machine and can be accessed by the pod
+8s          Normal    Started       pod/sitepulse-5c4f7d49fc-945qx   Container started
+8s          Warning   Unhealthy     pod/sitepulse-5c4f7d49fc-945qx   Readiness probe failed: Get "http://10.42.8.4:8000/readyz": dial tcp 10.42.8.4:8000: connect: connection refused
+6s          Warning   Unhealthy     pod/sitepulse-5c4f7d49fc-945qx   Startup probe failed: Get "http://10.42.8.4:8000/healthz": dial tcp 10.42.8.4:8000: connect: connection refused

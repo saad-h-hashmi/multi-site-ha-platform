@@ -1,0 +1,45 @@
+# suite=test_backup_restore host=saad-VMware-Virtual-Platform started=2026-11-21T11:05:27-06:00
+PASS|BR-00|marker object created before the backup|0.09s
+    | configmap/msha-restore-marker created
+PASS|BR-01|backup completes (etcd snapshot, Redis keys, secrets, manifests)|1.80s
+    | Backup -> backups/20261121-110527
+    |   etcd snapshot: etcd/msha-20261121-110527-site-a-server-1795280728 (24M) taken on site-a-server
+    |   redis keys: {"sitepulse:visits":"20"}
+    |   secrets: 6 files
+    |   kubernetes objects: k8s/sitepulse.yaml
+    | Done: backups/20261121-110527
+PASS|BR-02|backup contains an etcd snapshot and the counter value 20|0.03s
+    | total 23864
+    | -rw------- 1 saad saad 24432672 Nov 21 11:05 msha-20261121-110527-site-a-server-1795280728
+    | true
+PASS|BR-03|restore-data brings the counter back to 20|0.69s
+    | Restore 'data' from backups/20261121-110527
+    |   restored sitepulse:visits = 20
+    | Restore complete.
+    | now=20
+PASS|BR-04|marker object deleted after the backup (simulated operator mistake)|0.09s
+    | Error from server (NotFound): configmaps "msha-restore-marker" not found
+    | blocked as expected
+PASS|BR-05|full etcd restore (cluster-reset + rejoin) completes|100.63s
+    | Restore 'etcd' from backups/20261121-110527
+    |   1/5 stopping all K3s nodes
+    |   2/5 copying the snapshot into site-a-server and running 'k3s server --cluster-reset'
+    |   3/5 starting site-a-server (single-member etcd restored from the snapshot)
+    |   4/5 re-joining the other servers with empty etcd data
+    |       site-b-server rejoined
+    |       site-c-server rejoined
+    |   5/5 starting the agents
+    |   all 6 nodes Ready, API stable through the edge
+    | Restore complete.
+etcd_restore_seconds=101
+PASS|BR-06|the deleted marker object is back (state rolled back to the snapshot)|0.55s
+    | 2026-11-21T11:05:27-06:00
+PASS|BR-07|after restore: 3 healthy etcd members, 6 Ready nodes, app serving through the edge|1.08s
+    | NAME            STATUS   ROLES                AGE    VERSION
+    | site-a-agent    Ready    <none>               135m   v1.37.2+k3s1
+    | site-a-server   Ready    control-plane,etcd   136m   v1.37.2+k3s1
+    | site-b-agent    Ready    <none>               135m   v1.37.2+k3s1
+    | site-b-server   Ready    control-plane,etcd   136m   v1.37.2+k3s1
+    | site-c-agent    Ready    <none>               134m   v1.37.2+k3s1
+    | site-c-server   Ready    control-plane,etcd   135m   v1.37.2+k3s1
+# finished=2026-11-21T11:07:13-06:00 pass=8 fail=0

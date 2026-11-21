@@ -1,0 +1,9 @@
+%% High-availability design: redundancy at each layer
+flowchart LR
+  U["Client"] --> E["Edge HAProxy<br/>(single instance: lab SPOF)"]
+  E -->|"health-checked, 500 ms connect, 3 retries + redispatch"| T1["Traefik site A :80"] & T2["Traefik site B :80"] & T3["Traefik site C :80"]
+  T1 & T2 & T3 -->|"retry middleware, 500 ms dial timeout"| P1["SitePulse site A"] & P2["SitePulse site B"] & P3["SitePulse site C"]
+  P1 & P2 & P3 --> R["Redis (1 replica + PV)<br/>app degrades gracefully if down"]
+  E -->|"TCP checks"| API1["API site A"] & API2["API site B"] & API3["API site C"]
+  API1 & API2 & API3 --- ETCD["etcd Raft: tolerates 1 member loss"]
+  P1 & P2 & P3 -.->|"cluster DNS"| DNS["CoreDNS x3"]

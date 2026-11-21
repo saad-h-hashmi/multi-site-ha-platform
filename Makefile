@@ -101,3 +101,8 @@ clean: ## Remove all lab containers, networks and volumes (asks first; keeps ima
 .PHONY: clean-all
 clean-all: ## clean + remove generated secrets and downloaded images
 	@$(ROOT)/scripts/destroy.sh --secrets --images
+
+.PHONY: submission
+submission: ## Regenerate the submission/ package from docs, diagrams and evidence
+	@$(ROOT)/scripts/build-diagrams-doc.sh
+	@$(ROOT)/scripts/build-submission.sh

@@ -1,0 +1,18 @@
+# suite=test_failover host=saad-VMware-Virtual-Platform started=2026-11-21T09:40:52-06:00
+PASS|FO-01|deleted pod replaced in 12.9s, app stayed available (58/58 (100.0%))|0.12s
+    | 
+PASS|FO-02|hung pod left the Service and was restarted by kubelet (0 -> 1), app stayed up|0.02s
+    | 
+PASS|FO-03|unready pod received no traffic (0/20) and app stayed up|0.02s
+    | 
+FAIL|FO-04|app survived worker loss (longest outage 12.1) and node rejoined|0.02s
+    | 
+PASS|FO-05|quorum kept with 2/3 servers: new leader site-b-server, API writes worked|0.03s
+    | 
+PASS|FO-06|majority sites (2/3) kept the control plane; minority lost leader; healed|0.02s
+    | 
+PASS|FO-07|platform survived loss of one whole site (app outage 2.8, API yes)|0.02s
+    | 
+FAIL|FO-08|with 1/3 etcd members the API correctly refuses service, then recovers|0.29s
+    | Error from server (ServiceUnavailable): apiserver not ready
+# finished=2026-11-21T09:49:53-06:00 pass=6 fail=2

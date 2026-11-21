@@ -1,0 +1,102 @@
+# suite=test_network-after-rebuild host=saad-VMware-Virtual-Platform started=2026-11-21T11:20:03-06:00
+PASS|NET-01a|router-a is running|0.12s
+    | 
+PASS|NET-01b|router-b is running|0.10s
+    | 
+PASS|NET-01c|router-c is running|0.17s
+    | 
+PASS|NET-02a|router-a has 2 WireGuard peers with recent handshakes|0.13s
+    | 2 peers
+PASS|NET-02b|router-b has 2 WireGuard peers with recent handshakes|0.11s
+    | 2 peers
+PASS|NET-02c|router-c has 2 WireGuard peers with recent handshakes|0.15s
+    | 2 peers
+PASS|NET-03ab|site-a -> site-b ICMP|1.10s
+    | PING 10.20.20.99 (10.20.20.99): 56 data bytes
+    | 64 bytes from 10.20.20.99: seq=0 ttl=62 time=1.507 ms
+    | 64 bytes from 10.20.20.99: seq=1 ttl=62 time=0.751 ms
+    | 
+    | --- 10.20.20.99 ping statistics ---
+    | 2 packets transmitted, 2 packets received, 0% packet loss
+    | round-trip min/avg/max = 0.751/1.129/1.507 ms
+PASS|NET-03ac|site-a -> site-c ICMP|1.11s
+    | PING 10.30.30.99 (10.30.30.99): 56 data bytes
+    | 64 bytes from 10.30.30.99: seq=0 ttl=62 time=0.747 ms
+    | 64 bytes from 10.30.30.99: seq=1 ttl=62 time=0.682 ms
+    | 
+    | --- 10.30.30.99 ping statistics ---
+    | 2 packets transmitted, 2 packets received, 0% packet loss
+    | round-trip min/avg/max = 0.682/0.714/0.747 ms
+PASS|NET-03ba|site-b -> site-a ICMP|1.16s
+    | PING 10.10.10.99 (10.10.10.99): 56 data bytes
+    | 64 bytes from 10.10.10.99: seq=0 ttl=62 time=0.927 ms
+    | 64 bytes from 10.10.10.99: seq=1 ttl=62 time=0.217 ms
+    | 
+    | --- 10.10.10.99 ping statistics ---
+    | 2 packets transmitted, 2 packets received, 0% packet loss
+    | round-trip min/avg/max = 0.217/0.572/0.927 ms
+PASS|NET-03bc|site-b -> site-c ICMP|1.21s
+    | PING 10.30.30.99 (10.30.30.99): 56 data bytes
+    | 64 bytes from 10.30.30.99: seq=0 ttl=62 time=0.791 ms
+    | 64 bytes from 10.30.30.99: seq=1 ttl=62 time=1.007 ms
+    | 
+    | --- 10.30.30.99 ping statistics ---
+    | 2 packets transmitted, 2 packets received, 0% packet loss
+    | round-trip min/avg/max = 0.791/0.899/1.007 ms
+PASS|NET-03ca|site-c -> site-a ICMP|1.15s
+    | PING 10.10.10.99 (10.10.10.99): 56 data bytes
+    | 64 bytes from 10.10.10.99: seq=0 ttl=62 time=1.755 ms
+    | 64 bytes from 10.10.10.99: seq=1 ttl=62 time=0.622 ms
+    | 
+    | --- 10.10.10.99 ping statistics ---
+    | 2 packets transmitted, 2 packets received, 0% packet loss
+    | round-trip min/avg/max = 0.622/1.188/1.755 ms
+PASS|NET-03cb|site-c -> site-b ICMP|1.11s
+    | PING 10.20.20.99 (10.20.20.99): 56 data bytes
+    | 64 bytes from 10.20.20.99: seq=0 ttl=62 time=0.621 ms
+    | 64 bytes from 10.20.20.99: seq=1 ttl=62 time=2.806 ms
+    | 
+    | --- 10.20.20.99 ping statistics ---
+    | 2 packets transmitted, 2 packets received, 0% packet loss
+    | round-trip min/avg/max = 0.621/1.713/2.806 ms
+PASS|NET-04|site-a -> site-b path is router-a -> WireGuard -> router-b|0.11s
+    | traceroute to 10.20.20.99 (10.20.20.99), 30 hops max, 46 byte packets
+    |  1  10.10.10.1  0.007 ms
+    |  2  10.255.0.2  0.007 ms
+    |  3  10.20.20.99  0.109 ms
+PASS|NET-05|site-b -> site-c path is router-b -> WireGuard -> router-c|0.13s
+    | traceroute to 10.30.30.99 (10.30.30.99), 30 hops max, 46 byte packets
+    |  1  10.20.20.1  0.007 ms
+    |  2  10.255.0.3  0.403 ms
+    |  3  10.30.30.99  0.351 ms
+PASS|NET-06|tunnel carries traffic encrypted (WireGuard transfer counters increase)|2.33s
+    | sent bytes 62397772 -> 62489092
+PASS|FW-01|allowed inter-site port tcp/6443 (Kubernetes API) is open|0.14s
+    | 
+PASS|FW-02|non-allowed inter-site port tcp/2222 is blocked|3.09s
+    | blocked as expected
+PASS|FW-03|site LAN cannot reach the VMware/home network (192.168.30.2)|3.14s
+    | blocked as expected
+PASS|FW-04|site LAN reaches the internet through router NAT|0.14s
+    | 
+PASS|FW-05|router drops inbound non-WireGuard traffic from the WAN|3.72s
+    | blocked as expected
+PASS|ISO-01|site-a cannot reach site-b by bypassing the router (Docker host gateway)|3.12s
+    | PING 10.20.20.99 (10.20.20.99): 56 data bytes
+    | 
+    | --- 10.20.20.99 ping statistics ---
+    | 2 packets transmitted, 0 packets received, 100% packet loss
+    | blocked as expected
+PASS|ISO-02|site LAN hosts are not attached to the WAN network|0.04s
+    | {"msha-site-a-lan":{"IPAMConfig":{"IPv4Address":"10.10.10.99","IPv6Address":""},"Links":null,"Aliases":null,"DriverOpts":null,"GwPriority":0,"NetworkID":"1fdd94e345de449ae658a188f62011ba6c96bd3c17bb44d170dbea5e2922b7a9","EndpointID":"07a7af07ee4b14bb7b6f031ebb7d477aec3dfce0ec7e5990a9339759be59cd5c","Gateway":"10.10.10.254","IPAddress":"10.10.10.99","MacAddress":"52:63:d5:d1:7b:75","IPPrefixLen":24,"IPv6Gateway":"","GlobalIPv6Address":"","GlobalIPv6PrefixLen":0,"DNSNames":["probe-a","55cd650cd630"]}}
+PASS|DNS-01a|site-a resolves edge.lab.internal via lab DNS|0.19s
+    | 
+PASS|DNS-01b|site-b resolves edge.lab.internal via lab DNS|0.17s
+    | 
+PASS|DNS-01c|site-c resolves edge.lab.internal via lab DNS|0.16s
+    | 
+PASS|DNS-02|lab DNS resolves cross-site node names (site-c-server)|0.16s
+    | 
+PASS|DNS-03|lab DNS forwards external names (github.com)|0.15s
+    | 
+# finished=2026-11-21T11:20:34-06:00 pass=27 fail=0

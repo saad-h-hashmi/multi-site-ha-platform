@@ -1,0 +1,190 @@
+# suite=test_platform-after-rebuild host=saad-VMware-Virtual-Platform started=2026-11-21T11:20:34-06:00
+PASS|K8S-01|API reachable through the edge load balancer (/readyz)|0.09s
+    | ok
+PASS|K8S-02|all 6 nodes are Ready|0.11s
+    | site-a-agent    Ready   <none>               4m21s   v1.37.2+k3s1
+    | site-a-server   Ready   control-plane,etcd   5m56s   v1.37.2+k3s1
+    | site-b-agent    Ready   <none>               4m7s    v1.37.2+k3s1
+    | site-b-server   Ready   control-plane,etcd   5m19s   v1.37.2+k3s1
+    | site-c-agent    Ready   <none>               3m53s   v1.37.2+k3s1
+    | site-c-server   Ready   control-plane,etcd   4m39s   v1.37.2+k3s1
+PASS|K8S-03|3 nodes run control-plane + etcd (one per site)|0.14s
+    | site-a-server   Ready   control-plane,etcd   5m56s   v1.37.2+k3s1   site-a
+    | site-b-server   Ready   control-plane,etcd   5m19s   v1.37.2+k3s1   site-b
+    | site-c-server   Ready   control-plane,etcd   4m39s   v1.37.2+k3s1   site-c
+PASS|K8S-04a|etcd member on site-a-server reports healthy|0.17s
+    | {"health":"true","reason":""}
+PASS|K8S-04b|etcd member on site-b-server reports healthy|0.09s
+    | {"health":"true","reason":""}
+PASS|K8S-04c|etcd member on site-c-server reports healthy|0.11s
+    | {"health":"true","reason":""}
+PASS|K8S-05|etcd has exactly one leader and all members agree|0.39s
+    | site-a etcd_server_has_leader 1
+    | site-a etcd_server_is_leader 1
+    | site-b etcd_server_has_leader 1
+    | site-b etcd_server_is_leader 0
+    | site-c etcd_server_has_leader 1
+    | site-c etcd_server_is_leader 0
+PASS|K8S-06|nodes are labelled into 3 sites (topology zones)|0.14s
+    |       2 site-a
+    |       2 site-b
+    |       2 site-c
+PASS|K8S-07|cluster DNS (CoreDNS) runs 3 replicas|0.12s
+    | 3
+PASS|K8S-08|ingress (Traefik) runs 3 replicas, one per site|0.14s
+    | site-c-server
+    | site-b-agent
+    | site-a-agent
+PASS|APP-01|SitePulse deployment has 3/3 replicas available|0.15s
+    | 3
+PASS|APP-02|replicas are spread across all 3 sites|0.14s
+    | site-b-agent
+    | site-c-agent
+    | site-a-agent
+PASS|APP-03|health endpoint answers 200 through the edge|0.02s
+    | {
+    |   "status": "ok",
+    |   "pod": "sitepulse-5c4f7d49fc-p5xjz"
+    | }
+PASS|APP-04|load balancing: 30 requests reach >=3 pods via >=3 edge backends|1.04s
+    | site-a-agent sitepulse-5c4f7d49fc-4n6qk
+    | site-a-agent sitepulse-5c4f7d49fc-4n6qk
+    | site-a-agent sitepulse-5c4f7d49fc-4n6qk
+    | site-a-agent sitepulse-5c4f7d49fc-945qx
+    | site-a-agent sitepulse-5c4f7d49fc-945qx
+    | site-a-agent sitepulse-5c4f7d49fc-945qx
+    | site-a-agent sitepulse-5c4f7d49fc-p5xjz
+    | site-a-agent sitepulse-5c4f7d49fc-p5xjz
+    | site-a-agent sitepulse-5c4f7d49fc-p5xjz
+    | site-a-agent sitepulse-5c4f7d49fc-p5xjz
+    | site-b-agent sitepulse-5c4f7d49fc-4n6qk
+    | site-b-agent sitepulse-5c4f7d49fc-4n6qk
+    | site-b-agent sitepulse-5c4f7d49fc-4n6qk
+    | site-b-agent sitepulse-5c4f7d49fc-4n6qk
+    | site-b-agent sitepulse-5c4f7d49fc-945qx
+    | site-b-agent sitepulse-5c4f7d49fc-945qx
+    | site-b-agent sitepulse-5c4f7d49fc-p5xjz
+    | site-b-agent sitepulse-5c4f7d49fc-p5xjz
+    | site-b-agent sitepulse-5c4f7d49fc-p5xjz
+    | site-b-agent sitepulse-5c4f7d49fc-p5xjz
+    | site-c-server sitepulse-5c4f7d49fc-4n6qk
+    | site-c-server sitepulse-5c4f7d49fc-4n6qk
+    | site-c-server sitepulse-5c4f7d49fc-4n6qk
+    | site-c-server sitepulse-5c4f7d49fc-945qx
+    | site-c-server sitepulse-5c4f7d49fc-945qx
+    | site-c-server sitepulse-5c4f7d49fc-945qx
+    | site-c-server sitepulse-5c4f7d49fc-p5xjz
+    | site-c-server sitepulse-5c4f7d49fc-p5xjz
+    | site-c-server sitepulse-5c4f7d49fc-p5xjz
+    | site-c-server sitepulse-5c4f7d49fc-p5xjz
+PASS|APP-05|service discovery: app pod resolves and reaches redis.sitepulse.svc|1.24s
+    | redis -> 10.43.210.240
+PASS|APP-06|persistent counter increments across replicas (Redis on a PersistentVolume)|0.07s
+    | 1 -> 2
+PASS|APP-07|Redis data is on a bound PersistentVolumeClaim|0.14s
+    | Bound local-path
+PASS|APP-08|probes, resource limits, ConfigMap and Secret are wired into the pods|0.13s
+    | true
+PASS|APP-09|app reports its site/node and live replica table from the Kubernetes API|0.08s
+    | {
+    |   "ok": true,
+    |   "pods": [
+    |     {
+    |       "name": "sitepulse-5c4f7d49fc-4n6qk",
+    |       "node": "site-b-agent",
+    |       "site": "site-b",
+    |       "phase": "Running",
+    |       "ready": true,
+    |       "restarts": 0,
+    |       "ip": "10.42.6.4",
+    |       "terminating": false
+    |     },
+    |     {
+    |       "name": "sitepulse-5c4f7d49fc-945qx",
+    |       "node": "site-c-agent",
+    |       "site": "site-c",
+    |       "phase": "Running",
+    |       "ready": true,
+    |       "restarts": 0,
+    |       "ip": "10.42.8.4",
+    |       "terminating": false
+    |     },
+    |     {
+    |       "name": "sitepulse-5c4f7d49fc-p5xjz",
+    |       "node": "site-a-agent",
+    |       "site": "site-a",
+    |       "phase": "Running",
+    |       "ready": true,
+    |       "restarts": 0,
+    |       "ip": "10.42.4.3",
+    |       "terminating": false
+    |     }
+    |   ]
+    | }true
+PASS|SEC-01|RBAC: app service account can list pods in its namespace|0.09s
+    | yes
+PASS|SEC-02|RBAC: app service account can NOT read Secrets|0.10s
+    | no
+    | blocked as expected
+PASS|SEC-03|RBAC: app service account can NOT touch other namespaces|0.15s
+    | no
+    | blocked as expected
+PASS|SEC-04|Pod Security: a privileged pod is rejected in the app namespace|0.13s
+    | Error from server (Forbidden): pods "psa-probe" is forbidden: violates PodSecurity "restricted:latest": privileged (container "p" must not set securityContext.privileged=true), allowPrivilegeEscalation != false (container "p" must set securityContext.allowPrivilegeEscalation=false), unrestricted capabilities (container "p" must set securityContext.capabilities.drop=["ALL"]), runAsNonRoot != true (pod or container "p" must set securityContext.runAsNonRoot=true), seccompProfile (pod or container "p" must set securityContext.seccompProfile.type to "RuntimeDefault" or "Localhost")
+    | blocked as expected
+PASS|SEC-05|NetworkPolicy: a pod outside the app cannot reach Redis|5.74s
+    | Traceback (most recent call last):
+    |   File "<string>", line 1, in <module>
+    |     import socket;socket.create_connection(('redis.sitepulse.svc.cluster.local',6379),4)
+    |                   ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "/usr/local/lib/python3.13/socket.py", line 868, in create_connection
+    |     raise exceptions[0]
+    |   File "/usr/local/lib/python3.13/socket.py", line 853, in create_connection
+    |     sock.connect(sa)
+    |     ~~~~~~~~~~~~^^^^
+    | ConnectionRefusedError: [Errno 111] Connection refused
+    | pod default/np-probe terminated (Error)
+    | blocked as expected
+PASS|SEC-06|Secrets are encrypted at rest in etcd|1.02s
+    | Encryption Status: Enabled
+    | Current Rotation Stage: start
+    | Server Encryption Hashes: All hashes match
+    | 
+    | Active  Key Type  Name
+    | ------  --------  ----
+    |  *      AES-CBC   aescbckey
+PASS|SEC-07|no secrets are tracked by git|0.02s
+    | 
+PASS|MON-01|Prometheus is ready (via edge)|0.03s
+    | Prometheus Server is Ready.
+PASS|MON-02|every Prometheus target is up|0.14s
+    | up cadvisor site-a-agent
+    | up cadvisor site-a-server
+    | up cadvisor site-b-agent
+    | up cadvisor site-b-server
+    | up cadvisor site-c-agent
+    | up cadvisor site-c-server
+    | up edge-haproxy http://172.30.0.100:8405/metrics
+    | up etcd site-c-server
+    | up etcd site-a-server
+    | up etcd site-b-server
+    | up kube-state-metrics http://kube-state-metrics.monitoring.svc:8080/metrics
+    | up kubelet site-a-agent
+    | up kubelet site-a-server
+    | up kubelet site-b-agent
+    | up kubelet site-b-server
+    | up kubelet site-c-agent
+    | up kubelet site-c-server
+    | up sitepulse site-c-agent
+    | up sitepulse site-a-agent
+    | up sitepulse site-b-agent
+    | 20/20 targets up
+PASS|MON-03|Prometheus sees 3 etcd members and 6 Ready nodes|0.12s
+    | etcd=3 nodes=6
+PASS|EDGE-01|HAProxy stats page refuses access without a password|0.04s
+    | 
+PASS|EDGE-02|edge sees 3/3 API servers UP and exactly the 3 Traefik nodes UP for ingress|0.21s
+    | traefik nodes: site-a-agent site-b-agent site-c-server
+    | ingress UP:    site-a-agent site-b-agent site-c-server
+    | API UP: 3/3
+# finished=2026-11-21T11:20:47-06:00 pass=31 fail=0

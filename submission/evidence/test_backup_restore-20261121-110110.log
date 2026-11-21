@@ -1,0 +1,33 @@
+# suite=test_backup_restore host=saad-VMware-Virtual-Platform started=2026-11-21T11:01:10-06:00
+PASS|BR-01|backup completes (etcd snapshot, Redis keys, secrets, manifests)|1.70s
+    | Backup -> backups/20261121-110110
+    |   etcd snapshot: etcd/msha-20261121-110110-site-a-server-1795280471 (24M) taken on site-a-server
+    |   redis keys: {"sitepulse:visits":"14"}
+    |   secrets: 6 files
+    |   kubernetes objects: k8s/sitepulse.yaml
+    | Done: backups/20261121-110110
+PASS|BR-02|backup contains an etcd snapshot and the counter value 14|0.03s
+    | total 23864
+    | -rw------- 1 saad saad 24432672 Nov 21 11:01 msha-20261121-110110-site-a-server-1795280471
+    | true
+PASS|BR-03|restore-data brings the counter back to 14|0.48s
+    | Restore 'data' from backups/20261121-110110
+    |   restored sitepulse:visits = 14
+    | Restore complete.
+    | now=14
+PASS|BR-04|marker object deleted after the backup (simulated operator mistake)|0.11s
+    | Error from server (NotFound): configmaps "msha-restore-marker" not found
+    | blocked as expected
+FAIL|BR-05|full etcd restore (cluster-reset + rejoin) completes|5.55s
+    | Restore 'etcd' from backups/20261121-110110
+    |   1/5 stopping all K3s nodes
+    |   2/5 copying the snapshot into site-a-server and running 'k3s server --cluster-reset'
+    | docker: Error response from daemon: create backups/20261121-110110/etcd: "backups/20261121-110110/etcd" includes invalid characters for a local volume name, only "[a-zA-Z0-9][a-zA-Z0-9_.-]" are allowed. If you intended to pass a host directory, use absolute path
+    | 
+    | Run 'docker run --help' for more information
+etcd_restore_seconds=5
+FAIL|BR-06|the deleted marker object is back (state rolled back to the snapshot)|11.10s
+    | Unable to connect to the server: EOF
+FAIL|BR-07|after restore: 3 healthy etcd members, 6 Ready nodes, app serving through the edge|0.03s
+    | Error response from daemon: container 0c84a8d70c2b4fa4017aa047a7d409c1e3d69fc0458c9b947b3af9838a93333c is not running
+# finished=2026-11-21T11:01:29-06:00 pass=4 fail=3

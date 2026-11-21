@@ -1,0 +1,23 @@
+%% Three-site network topology with routing and firewall points
+flowchart LR
+  subgraph A["Site A LAN 10.10.10.0/24"]
+    a11["server .11"]; a21["agent .21"]
+  end
+  subgraph B["Site B LAN 10.20.20.0/24"]
+    b11["server .11"]; b21["agent .21"]
+  end
+  subgraph C["Site C LAN 10.30.30.0/24"]
+    c11["server .11"]; c21["agent .21"]
+  end
+  a11 & a21 -->|"default via .1"| RA
+  b11 & b21 -->|"default via .1"| RB
+  c11 & c21 -->|"default via .1"| RC
+  RA["router-a<br/>wg0 10.255.0.1<br/>FW: default DROP"]
+  RB["router-b<br/>wg0 10.255.0.2<br/>FW: default DROP"]
+  RC["router-c<br/>wg0 10.255.0.3<br/>FW: default DROP"]
+  RA <-->|"UDP 51820 encrypted<br/>10.20/16 + 10.30/16 via wg0"| RB
+  RB <-->|"UDP 51820"| RC
+  RC <-->|"UDP 51820"| RA
+  RA & RB & RC ---|"eth WAN .11/.12/.13"| WAN(("WAN 172.30.0.0/24"))
+  WAN --- EDGE["edge .100"] & DNS["dns .53"] & REG["registry .50"]
+  WAN -->|"SNAT via VM"| NET(("Internet"))

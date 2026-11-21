@@ -1,0 +1,970 @@
+# suite=test_rebuild host=saad-VMware-Virtual-Platform started=2026-11-21T11:13:25-06:00
+PASS|RB-01|backup taken before destroying the platform|2.39s
+    | Backup -> backups/20261121-111325
+    |   etcd snapshot: etcd/msha-20261121-111325-site-a-server-1795281206 (24M) taken on site-a-server
+    |   redis keys: {"sitepulse:visits":"21"}
+    |   secrets: 6 files
+    |   kubernetes objects: k8s/sitepulse.yaml
+    | Done: backups/20261121-111325
+PASS|RB-02|all lab containers, networks and volumes destroyed|5.34s
+    | This removes: 12 containers, 4 networks, 13 volumes (all msha-*).
+    |   containers removed
+    |   networks removed
+    |   volumes removed
+    |   build/ removed
+    | Lab removed. Rebuild with: make deploy
+PASS|RB-03|make deploy rebuilt the full platform from an empty state|390.70s
+    | 
+    | PLAY [Deploy the multi-site network] *******************************************
+    | 
+    | TASK [secrets : Create the secrets directory] **********************************
+    | ok: [lab-host]
+    | 
+    | TASK [secrets : Generate (or reuse) random secrets] ****************************
+    | ok: [lab-host]
+    | 
+    | TASK [secrets : Generate a WireGuard private key per site router (only if missing)] ***
+    | ok: [lab-host] => (item=router-a)
+    | ok: [lab-host] => (item=router-b)
+    | ok: [lab-host] => (item=router-c)
+    | 
+    | TASK [secrets : Derive WireGuard public keys] **********************************
+    | ok: [lab-host] => (item=router-a)
+    | ok: [lab-host] => (item=router-b)
+    | ok: [lab-host] => (item=router-c)
+    | 
+    | TASK [secrets : Record WireGuard public keys] **********************************
+    | ok: [lab-host]
+    | 
+    | TASK [secrets : Make sure secret files are private] ****************************
+    | ok: [lab-host] => (item=k3s-token)
+    | ok: [lab-host] => (item=redis-password)
+    | ok: [lab-host] => (item=haproxy-stats-password)
+    | ok: [lab-host] => (item=wg-a.key)
+    | ok: [lab-host] => (item=wg-b.key)
+    | ok: [lab-host] => (item=wg-c.key)
+    | 
+    | TASK [network : Build the router image] ****************************************
+    | ok: [lab-host]
+    | 
+    | TASK [network : Create the WAN / transit network] ******************************
+    | changed: [lab-host]
+    | 
+    | TASK [network : Create one LAN network per site] *******************************
+    | changed: [lab-host] => (item=site-a)
+    | changed: [lab-host] => (item=site-b)
+    | changed: [lab-host] => (item=site-c)
+    | 
+    | TASK [network : Create router config directories] ******************************
+    | changed: [lab-host] => (item=site-a)
+    | changed: [lab-host] => (item=site-b)
+    | changed: [lab-host] => (item=site-c)
+    | 
+    | TASK [network : Render router scripts] *****************************************
+    | changed: [lab-host] => (item=site-a)
+    | changed: [lab-host] => (item=site-b)
+    | changed: [lab-host] => (item=site-c)
+    | 
+    | TASK [network : Install router private keys] ***********************************
+    | changed: [lab-host] => (item=site-a)
+    | changed: [lab-host] => (item=site-b)
+    | changed: [lab-host] => (item=site-c)
+    | 
+    | TASK [network : Run the site routers] ******************************************
+    | changed: [lab-host] => (item=router-a)
+    | changed: [lab-host] => (item=router-b)
+    | changed: [lab-host] => (item=router-c)
+    | 
+    | TASK [network : Wait until every router reports ready] *************************
+    | ok: [lab-host] => (item=router-a)
+    | ok: [lab-host] => (item=router-b)
+    | ok: [lab-host] => (item=router-c)
+    | 
+    | PLAY [Deploy shared services] **************************************************
+    | 
+    | TASK [secrets : Create the secrets directory] **********************************
+    | ok: [lab-host]
+    | 
+    | TASK [secrets : Generate (or reuse) random secrets] ****************************
+    | ok: [lab-host]
+    | 
+    | TASK [secrets : Generate a WireGuard private key per site router (only if missing)] ***
+    | ok: [lab-host] => (item=router-a)
+    | ok: [lab-host] => (item=router-b)
+    | ok: [lab-host] => (item=router-c)
+    | 
+    | TASK [secrets : Derive WireGuard public keys] **********************************
+    | ok: [lab-host] => (item=router-a)
+    | ok: [lab-host] => (item=router-b)
+    | ok: [lab-host] => (item=router-c)
+    | 
+    | TASK [secrets : Record WireGuard public keys] **********************************
+    | ok: [lab-host]
+    | 
+    | TASK [secrets : Make sure secret files are private] ****************************
+    | ok: [lab-host] => (item=k3s-token)
+    | ok: [lab-host] => (item=redis-password)
+    | ok: [lab-host] => (item=haproxy-stats-password)
+    | ok: [lab-host] => (item=wg-a.key)
+    | ok: [lab-host] => (item=wg-b.key)
+    | ok: [lab-host] => (item=wg-c.key)
+    | 
+    | TASK [services : Create service config directories] ****************************
+    | changed: [lab-host] => (item={'dir': 'dns', 'mode': '0755'})
+    | changed: [lab-host] => (item={'dir': 'edge', 'mode': '0700'})
+    | 
+    | TASK [services : Render lab DNS configuration] *********************************
+    | changed: [lab-host] => (item=Corefile)
+    | changed: [lab-host] => (item=lab.internal.zone)
+    | 
+    | TASK [services : Run the lab DNS server] ***************************************
+    | changed: [lab-host]
+    | 
+    | TASK [services : Run the container image registry] *****************************
+    | changed: [lab-host]
+    | 
+    | TASK [services : Render edge load balancer configuration] **********************
+    | changed: [lab-host] => (item=haproxy.cfg)
+    | changed: [lab-host] => (item=edge.sh)
+    | 
+    | TASK [services : Validate the HAProxy configuration] ***************************
+    | ok: [lab-host]
+    | 
+    | TASK [services : Run the edge load balancer] ***********************************
+    | changed: [lab-host]
+    | 
+    | PLAY [Deploy the K3s cluster] **************************************************
+    | 
+    | TASK [Gathering Facts] *********************************************************
+    | ok: [lab-host]
+    | 
+    | TASK [secrets : Create the secrets directory] **********************************
+    | ok: [lab-host]
+    | 
+    | TASK [secrets : Generate (or reuse) random secrets] ****************************
+    | ok: [lab-host]
+    | 
+    | TASK [secrets : Generate a WireGuard private key per site router (only if missing)] ***
+    | ok: [lab-host] => (item=router-a)
+    | ok: [lab-host] => (item=router-b)
+    | ok: [lab-host] => (item=router-c)
+    | 
+    | TASK [secrets : Derive WireGuard public keys] **********************************
+    | ok: [lab-host] => (item=router-a)
+    | ok: [lab-host] => (item=router-b)
+    | ok: [lab-host] => (item=router-c)
+    | 
+    | TASK [secrets : Record WireGuard public keys] **********************************
+    | ok: [lab-host]
+    | 
+    | TASK [secrets : Make sure secret files are private] ****************************
+    | ok: [lab-host] => (item=k3s-token)
+    | ok: [lab-host] => (item=redis-password)
+    | ok: [lab-host] => (item=haproxy-stats-password)
+    | ok: [lab-host] => (item=wg-a.key)
+    | ok: [lab-host] => (item=wg-b.key)
+    | ok: [lab-host] => (item=wg-c.key)
+    | 
+    | TASK [k3s : Detect the VM's primary IP (added to the API certificate for Windows access)] ***
+    | ok: [lab-host]
+    | 
+    | TASK [k3s : Build the node list] ***********************************************
+    | ok: [lab-host] => (item=site-a)
+    | ok: [lab-host] => (item=site-b)
+    | ok: [lab-host] => (item=site-c)
+    | 
+    | TASK [k3s : Wait for the first server's API before adding more nodes] **********
+    | included: /home/saad/multi-site-ha-platform/ansible/roles/k3s/tasks/node.yml for lab-host
+    | 
+    | TASK [k3s : site-a-server | config directory] **********************************
+    | changed: [lab-host]
+    | 
+    | TASK [k3s : site-a-server | render configuration] ******************************
+    | changed: [lab-host] => (item=node.sh)
+    | changed: [lab-host] => (item=config.yaml)
+    | changed: [lab-host] => (item=registries.yaml)
+    | 
+    | TASK [k3s : site-a-server | cluster token] *************************************
+    | changed: [lab-host]
+    | 
+    | TASK [k3s : site-a-server | run node container] ********************************
+    | changed: [lab-host]
+    | FAILED - RETRYING: [lab-host]: site-a-server | wait until the node is Ready (60 retries left).
+    | FAILED - RETRYING: [lab-host]: site-a-server | wait until the node is Ready (59 retries left).
+    | 
+    | TASK [k3s : site-a-server | wait until the node is Ready] **********************
+    | ok: [lab-host]
+    | 
+    | TASK [k3s : Join the remaining servers (one at a time)] ************************
+    | included: /home/saad/multi-site-ha-platform/ansible/roles/k3s/tasks/node.yml for lab-host => (item=site-b-server)
+    | included: /home/saad/multi-site-ha-platform/ansible/roles/k3s/tasks/node.yml for lab-host => (item=site-c-server)
+    | 
+    | TASK [k3s : site-b-server | config directory] **********************************
+    | changed: [lab-host]
+    | 
+    | TASK [k3s : site-b-server | render configuration] ******************************
+    | changed: [lab-host] => (item=node.sh)
+    | changed: [lab-host] => (item=config.yaml)
+    | changed: [lab-host] => (item=registries.yaml)
+    | 
+    | TASK [k3s : site-b-server | cluster token] *************************************
+    | changed: [lab-host]
+    | 
+    | TASK [k3s : site-b-server | run node container] ********************************
+    | changed: [lab-host]
+    | FAILED - RETRYING: [lab-host]: site-b-server | wait until the node is Ready (60 retries left).
+    | FAILED - RETRYING: [lab-host]: site-b-server | wait until the node is Ready (59 retries left).
+    | FAILED - RETRYING: [lab-host]: site-b-server | wait until the node is Ready (58 retries left).
+    | FAILED - RETRYING: [lab-host]: site-b-server | wait until the node is Ready (57 retries left).
+    | FAILED - RETRYING: [lab-host]: site-b-server | wait until the node is Ready (56 retries left).
+    | 
+    | TASK [k3s : site-b-server | wait until the node is Ready] **********************
+    | ok: [lab-host]
+    | 
+    | TASK [k3s : site-c-server | config directory] **********************************
+    | changed: [lab-host]
+    | 
+    | TASK [k3s : site-c-server | render configuration] ******************************
+    | changed: [lab-host] => (item=node.sh)
+    | changed: [lab-host] => (item=config.yaml)
+    | changed: [lab-host] => (item=registries.yaml)
+    | 
+    | TASK [k3s : site-c-server | cluster token] *************************************
+    | changed: [lab-host]
+    | 
+    | TASK [k3s : site-c-server | run node container] ********************************
+    | changed: [lab-host]
+    | FAILED - RETRYING: [lab-host]: site-c-server | wait until the node is Ready (60 retries left).
+    | FAILED - RETRYING: [lab-host]: site-c-server | wait until the node is Ready (59 retries left).
+    | FAILED - RETRYING: [lab-host]: site-c-server | wait until the node is Ready (58 retries left).
+    | FAILED - RETRYING: [lab-host]: site-c-server | wait until the node is Ready (57 retries left).
+    | FAILED - RETRYING: [lab-host]: site-c-server | wait until the node is Ready (56 retries left).
+    | 
+    | TASK [k3s : site-c-server | wait until the node is Ready] **********************
+    | ok: [lab-host]
+    | 
+    | TASK [k3s : Join the agents] ***************************************************
+    | included: /home/saad/multi-site-ha-platform/ansible/roles/k3s/tasks/node.yml for lab-host => (item=site-a-agent)
+    | included: /home/saad/multi-site-ha-platform/ansible/roles/k3s/tasks/node.yml for lab-host => (item=site-b-agent)
+    | included: /home/saad/multi-site-ha-platform/ansible/roles/k3s/tasks/node.yml for lab-host => (item=site-c-agent)
+    | 
+    | TASK [k3s : site-a-agent | config directory] ***********************************
+    | changed: [lab-host]
+    | 
+    | TASK [k3s : site-a-agent | render configuration] *******************************
+    | changed: [lab-host] => (item=node.sh)
+    | changed: [lab-host] => (item=config.yaml)
+    | changed: [lab-host] => (item=registries.yaml)
+    | 
+    | TASK [k3s : site-a-agent | cluster token] **************************************
+    | changed: [lab-host]
+    | 
+    | TASK [k3s : site-a-agent | run node container] *********************************
+    | changed: [lab-host]
+    | FAILED - RETRYING: [lab-host]: site-a-agent | wait until the node is Ready (60 retries left).
+    | 
+    | TASK [k3s : site-a-agent | wait until the node is Ready] ***********************
+    | ok: [lab-host]
+    | 
+    | TASK [k3s : site-b-agent | config directory] ***********************************
+    | changed: [lab-host]
+    | 
+    | TASK [k3s : site-b-agent | render configuration] *******************************
+    | changed: [lab-host] => (item=node.sh)
+    | changed: [lab-host] => (item=config.yaml)
+    | changed: [lab-host] => (item=registries.yaml)
+    | 
+    | TASK [k3s : site-b-agent | cluster token] **************************************
+    | changed: [lab-host]
+    | 
+    | TASK [k3s : site-b-agent | run node container] *********************************
+    | changed: [lab-host]
+    | FAILED - RETRYING: [lab-host]: site-b-agent | wait until the node is Ready (60 retries left).
+    | 
+    | TASK [k3s : site-b-agent | wait until the node is Ready] ***********************
+    | ok: [lab-host]
+    | 
+    | TASK [k3s : site-c-agent | config directory] ***********************************
+    | changed: [lab-host]
+    | 
+    | TASK [k3s : site-c-agent | render configuration] *******************************
+    | changed: [lab-host] => (item=node.sh)
+    | changed: [lab-host] => (item=config.yaml)
+    | changed: [lab-host] => (item=registries.yaml)
+    | 
+    | TASK [k3s : site-c-agent | cluster token] **************************************
+    | changed: [lab-host]
+    | 
+    | TASK [k3s : site-c-agent | run node container] *********************************
+    | changed: [lab-host]
+    | FAILED - RETRYING: [lab-host]: site-c-agent | wait until the node is Ready (60 retries left).
+    | 
+    | TASK [k3s : site-c-agent | wait until the node is Ready] ***********************
+    | ok: [lab-host]
+    | 
+    | TASK [k3s : Verify etcd is healthy on every server (etcd's own /health endpoint)] ***
+    | ok: [lab-host] => (item=site-a-server)
+    | ok: [lab-host] => (item=site-b-server)
+    | ok: [lab-host] => (item=site-c-server)
+    | 
+    | TASK [k3s : Fetch the admin kubeconfig] ****************************************
+    | ok: [lab-host]
+    | 
+    | TASK [k3s : Write kubeconfig for this VM (API through the edge load balancer)] ***
+    | changed: [lab-host]
+    | 
+    | TASK [k3s : Write kubeconfig for the Windows host (API through the VM's IP)] ***
+    | changed: [lab-host]
+    | 
+    | TASK [k3s : Cluster summary] ***************************************************
+    | ok: [lab-host]
+    | 
+    | TASK [k3s : Show nodes] ********************************************************
+    | ok: [lab-host] => {
+    |     "nodes_out.stdout_lines": [
+    |         "NAME            STATUS   ROLES                AGE     VERSION        INTERNAL-IP   EXTERNAL-IP   OS-IMAGE           KERNEL-VERSION             CONTAINER-RUNTIME",
+    |         "site-a-agent    Ready    <none>               36s     v1.37.2+k3s1   10.10.10.21   <none>        K3s v1.37.2+k3s1   7.0.0-44-generic (amd64)   containerd://2.3.7-k3s1",
+    |         "site-a-server   Ready    control-plane,etcd   2m11s   v1.37.2+k3s1   10.10.10.11   <none>        K3s v1.37.2+k3s1   7.0.0-44-generic (amd64)   containerd://2.3.7-k3s1",
+    |         "site-b-agent    Ready    <none>               22s     v1.37.2+k3s1   10.20.20.21   <none>        K3s v1.37.2+k3s1   7.0.0-44-generic (amd64)   containerd://2.3.7-k3s1",
+    |         "site-b-server   Ready    control-plane,etcd   94s     v1.37.2+k3s1   10.20.20.11   <none>        K3s v1.37.2+k3s1   7.0.0-44-generic (amd64)   containerd://2.3.7-k3s1",
+    |         "site-c-agent    Ready    <none>               8s      v1.37.2+k3s1   10.30.30.21   <none>        K3s v1.37.2+k3s1   7.0.0-44-generic (amd64)   containerd://2.3.7-k3s1",
+    |         "site-c-server   Ready    control-plane,etcd   54s     v1.37.2+k3s1   10.30.30.11   <none>        K3s v1.37.2+k3s1   7.0.0-44-generic (amd64)   containerd://2.3.7-k3s1"
+    |     ]
+    | }
+    | 
+    | PLAY [Deploy the platform layer and the demo application] **********************
+    | 
+    | TASK [secrets : Create the secrets directory] **********************************
+    | ok: [lab-host]
+    | 
+    | TASK [secrets : Generate (or reuse) random secrets] ****************************
+    | ok: [lab-host]
+    | 
+    | TASK [secrets : Generate a WireGuard private key per site router (only if missing)] ***
+    | ok: [lab-host] => (item=router-a)
+    | ok: [lab-host] => (item=router-b)
+    | ok: [lab-host] => (item=router-c)
+    | 
+    | TASK [secrets : Derive WireGuard public keys] **********************************
+    | ok: [lab-host] => (item=router-a)
+    | ok: [lab-host] => (item=router-b)
+    | ok: [lab-host] => (item=router-c)
+    | 
+    | TASK [secrets : Record WireGuard public keys] **********************************
+    | ok: [lab-host]
+    | 
+    | TASK [secrets : Make sure secret files are private] ****************************
+    | ok: [lab-host] => (item=k3s-token)
+    | ok: [lab-host] => (item=redis-password)
+    | ok: [lab-host] => (item=haproxy-stats-password)
+    | ok: [lab-host] => (item=wg-a.key)
+    | ok: [lab-host] => (item=wg-b.key)
+    | ok: [lab-host] => (item=wg-c.key)
+    | 
+    | TASK [platform : Platform manifests (namespaces, Traefik HA)] ******************
+    | included: /home/saad/multi-site-ha-platform/ansible/tasks/kubectl-apply.yml for lab-host
+    | 
+    | TASK [platform : Diff platform manifests against the cluster] ******************
+    | ok: [lab-host]
+    | 
+    | TASK [platform : Apply platform manifests] *************************************
+    | changed: [lab-host]
+    | 
+    | TASK [platform : Run CoreDNS with 3 replicas (K3s default is 1, a single point of failure for DNS)] ***
+    | changed: [lab-host]
+    | 
+    | TASK [platform : Check the image tag in kustomization.yaml matches app.version] ***
+    | ok: [lab-host]
+    | 
+    | TASK [platform : Hash the application source] **********************************
+    | ok: [lab-host]
+    | 
+    | TASK [platform : Look up the current SitePulse image] **************************
+    | ok: [lab-host]
+    | 
+    | TASK [platform : Check whether the lab registry already has this version] ******
+    | ok: [lab-host]
+    | 
+    | TASK [platform : Push the SitePulse image to the lab registry] *****************
+    | changed: [lab-host]
+    | 
+    | TASK [platform : Create or update the Redis password Secret (value from .secrets/)] ***
+    | changed: [lab-host]
+    | 
+    | TASK [platform : SitePulse application manifests] ******************************
+    | included: /home/saad/multi-site-ha-platform/ansible/tasks/kubectl-apply.yml for lab-host
+    | 
+    | TASK [platform : Diff sitepulse manifests against the cluster] *****************
+    | ok: [lab-host]
+    | 
+    | TASK [platform : Apply sitepulse manifests] ************************************
+    | changed: [lab-host]
+    | 
+    | TASK [platform : Wait for Redis and SitePulse to become ready] *****************
+    | ok: [lab-host] => (item=statefulset/redis)
+    | ok: [lab-host] => (item=deployment/sitepulse)
+    | 
+    | TASK [platform : Wait for Traefik to run three replicas] ***********************
+    | ok: [lab-host]
+    | 
+    | TASK [platform : Wait until the application answers through the edge load balancer] ***
+    | ok: [lab-host]
+    | 
+    | PLAY [Deploy monitoring] *******************************************************
+    | 
+    | TASK [secrets : Create the secrets directory] **********************************
+    | ok: [lab-host]
+    | 
+    | TASK [secrets : Generate (or reuse) random secrets] ****************************
+    | ok: [lab-host]
+    | 
+    | TASK [secrets : Generate a WireGuard private key per site router (only if missing)] ***
+    | ok: [lab-host] => (item=router-a)
+    | ok: [lab-host] => (item=router-b)
+    | ok: [lab-host] => (item=router-c)
+    | 
+    | TASK [secrets : Derive WireGuard public keys] **********************************
+    | ok: [lab-host] => (item=router-a)
+    | ok: [lab-host] => (item=router-b)
+    | ok: [lab-host] => (item=router-c)
+    | 
+    | TASK [secrets : Record WireGuard public keys] **********************************
+    | ok: [lab-host]
+    | 
+    | TASK [secrets : Make sure secret files are private] ****************************
+    | ok: [lab-host] => (item=k3s-token)
+    | ok: [lab-host] => (item=redis-password)
+    | ok: [lab-host] => (item=haproxy-stats-password)
+    | ok: [lab-host] => (item=wg-a.key)
+    | ok: [lab-host] => (item=wg-b.key)
+    | ok: [lab-host] => (item=wg-c.key)
+    | 
+    | TASK [monitoring : Platform manifests (the monitoring namespace)] **************
+    | included: /home/saad/multi-site-ha-platform/ansible/tasks/kubectl-apply.yml for lab-host
+    | 
+    | TASK [monitoring : Diff platform manifests against the cluster] ****************
+    | ok: [lab-host]
+    | 
+    | TASK [monitoring : Monitoring manifests] ***************************************
+    | included: /home/saad/multi-site-ha-platform/ansible/tasks/kubectl-apply.yml for lab-host
+    | 
+    | TASK [monitoring : Diff monitoring manifests against the cluster] **************
+    | ok: [lab-host]
+    | 
+    | TASK [monitoring : Apply monitoring manifests] *********************************
+    | changed: [lab-host]
+    | 
+    | TASK [monitoring : Wait for the monitoring stack] ******************************
+    | ok: [lab-host] => (item=kube-state-metrics)
+    | ok: [lab-host] => (item=prometheus)
+    | FAILED - RETRYING: [lab-host]: Wait until Prometheus answers through the edge load balancer (30 retries left).
+    | 
+    | TASK [monitoring : Wait until Prometheus answers through the edge load balancer] ***
+    | ok: [lab-host]
+    | 
+    | PLAY RECAP *********************************************************************
+    | lab-host                   : ok=113  changed=44   unreachable=0    failed=0    skipped=4    rescued=0    ignored=0   
+rebuild_seconds=391
+PASS|RB-04|network test suite passes on the rebuilt platform|31.01s
+    | == Starting probe containers (one per site, default route via the site router)
+    | == Underlay and tunnels
+    |   [PASS] NET-01a  router-a is running (0.12s)
+    |   [PASS] NET-01b  router-b is running (0.10s)
+    |   [PASS] NET-01c  router-c is running (0.17s)
+    |   [PASS] NET-02a  router-a has 2 WireGuard peers with recent handshakes (0.13s)
+    |   [PASS] NET-02b  router-b has 2 WireGuard peers with recent handshakes (0.11s)
+    |   [PASS] NET-02c  router-c has 2 WireGuard peers with recent handshakes (0.15s)
+    | == Site-to-site connectivity (routed through WireGuard)
+    |   [PASS] NET-03ab site-a -> site-b ICMP (1.10s)
+    |   [PASS] NET-03ac site-a -> site-c ICMP (1.11s)
+    |   [PASS] NET-03ba site-b -> site-a ICMP (1.16s)
+    |   [PASS] NET-03bc site-b -> site-c ICMP (1.21s)
+    |   [PASS] NET-03ca site-c -> site-a ICMP (1.15s)
+    |   [PASS] NET-03cb site-c -> site-b ICMP (1.11s)
+    |   [PASS] NET-04   site-a -> site-b path is router-a -> WireGuard -> router-b (0.11s)
+    |   [PASS] NET-05   site-b -> site-c path is router-b -> WireGuard -> router-c (0.13s)
+    |   [PASS] NET-06   tunnel carries traffic encrypted (WireGuard transfer counters increase) (2.33s)
+    | == Firewall policy
+    |   [PASS] FW-01    allowed inter-site port tcp/6443 (Kubernetes API) is open (0.14s)
+    |   [PASS] FW-02    non-allowed inter-site port tcp/2222 is blocked (3.09s)
+    |   [PASS] FW-03    site LAN cannot reach the VMware/home network (192.168.30.2) (3.14s)
+    |   [PASS] FW-04    site LAN reaches the internet through router NAT (0.14s)
+    |   [PASS] FW-05    router drops inbound non-WireGuard traffic from the WAN (3.72s)
+    | == Isolation
+    |   [PASS] ISO-01   site-a cannot reach site-b by bypassing the router (Docker host gateway) (3.12s)
+    |   [PASS] ISO-02   site LAN hosts are not attached to the WAN network (0.04s)
+    | == Lab DNS
+    |   [PASS] DNS-01a  site-a resolves edge.lab.internal via lab DNS (0.19s)
+    |   [PASS] DNS-01b  site-b resolves edge.lab.internal via lab DNS (0.17s)
+    |   [PASS] DNS-01c  site-c resolves edge.lab.internal via lab DNS (0.16s)
+    |   [PASS] DNS-02   lab DNS resolves cross-site node names (site-c-server) (0.16s)
+    |   [PASS] DNS-03   lab DNS forwards external names (github.com) (0.15s)
+    |   ---- test_network-after-rebuild: 27 passed, 0 failed  (log: evidence/tests/test_network-after-rebuild-20261121-112003.log)
+PASS|RB-05|platform test suite passes on the rebuilt platform|13.13s
+    | == Kubernetes control plane
+    |   [PASS] K8S-01   API reachable through the edge load balancer (/readyz) (0.09s)
+    |   [PASS] K8S-02   all 6 nodes are Ready (0.11s)
+    |   [PASS] K8S-03   3 nodes run control-plane + etcd (one per site) (0.14s)
+    |   [PASS] K8S-04a  etcd member on site-a-server reports healthy (0.17s)
+    |   [PASS] K8S-04b  etcd member on site-b-server reports healthy (0.09s)
+    |   [PASS] K8S-04c  etcd member on site-c-server reports healthy (0.11s)
+    |   [PASS] K8S-05   etcd has exactly one leader and all members agree (0.39s)
+    |   [PASS] K8S-06   nodes are labelled into 3 sites (topology zones) (0.14s)
+    |   [PASS] K8S-07   cluster DNS (CoreDNS) runs 3 replicas (0.12s)
+    |   [PASS] K8S-08   ingress (Traefik) runs 3 replicas, one per site (0.14s)
+    | == Application
+    |   [PASS] APP-01   SitePulse deployment has 3/3 replicas available (0.15s)
+    |   [PASS] APP-02   replicas are spread across all 3 sites (0.14s)
+    |   [PASS] APP-03   health endpoint answers 200 through the edge (0.02s)
+    |   [PASS] APP-04   load balancing: 30 requests reach >=3 pods via >=3 edge backends (1.04s)
+    |   [PASS] APP-05   service discovery: app pod resolves and reaches redis.sitepulse.svc (1.24s)
+    |   [PASS] APP-06   persistent counter increments across replicas (Redis on a PersistentVolume) (0.07s)
+    |   [PASS] APP-07   Redis data is on a bound PersistentVolumeClaim (0.14s)
+    |   [PASS] APP-08   probes, resource limits, ConfigMap and Secret are wired into the pods (0.13s)
+    |   [PASS] APP-09   app reports its site/node and live replica table from the Kubernetes API (0.08s)
+    | == Security controls
+    |   [PASS] SEC-01   RBAC: app service account can list pods in its namespace (0.09s)
+    |   [PASS] SEC-02   RBAC: app service account can NOT read Secrets (0.10s)
+    |   [PASS] SEC-03   RBAC: app service account can NOT touch other namespaces (0.15s)
+    |   [PASS] SEC-04   Pod Security: a privileged pod is rejected in the app namespace (0.13s)
+    |   [PASS] SEC-05   NetworkPolicy: a pod outside the app cannot reach Redis (5.74s)
+    |   [PASS] SEC-06   Secrets are encrypted at rest in etcd (1.02s)
+    |   [PASS] SEC-07   no secrets are tracked by git (0.02s)
+    | == Monitoring and edge
+    |   [PASS] MON-01   Prometheus is ready (via edge) (0.03s)
+    |   [PASS] MON-02   every Prometheus target is up (0.14s)
+    |   [PASS] MON-03   Prometheus sees 3 etcd members and 6 Ready nodes (0.12s)
+    |   [PASS] EDGE-01  HAProxy stats page refuses access without a password (0.04s)
+    |   [PASS] EDGE-02  edge sees 3/3 API servers UP and exactly the 3 Traefik nodes UP for ingress (0.21s)
+    |   ---- test_platform-after-rebuild: 31 passed, 0 failed  (log: evidence/tests/test_platform-after-rebuild-20261121-112034.log)
+PASS|RB-06|second deploy changes nothing (idempotent)|130.58s
+    | 
+    | PLAY [Deploy the multi-site network] *******************************************
+    | 
+    | TASK [secrets : Create the secrets directory] **********************************
+    | ok: [lab-host]
+    | 
+    | TASK [secrets : Generate (or reuse) random secrets] ****************************
+    | ok: [lab-host]
+    | 
+    | TASK [secrets : Generate a WireGuard private key per site router (only if missing)] ***
+    | ok: [lab-host] => (item=router-a)
+    | ok: [lab-host] => (item=router-b)
+    | ok: [lab-host] => (item=router-c)
+    | 
+    | TASK [secrets : Derive WireGuard public keys] **********************************
+    | ok: [lab-host] => (item=router-a)
+    | ok: [lab-host] => (item=router-b)
+    | ok: [lab-host] => (item=router-c)
+    | 
+    | TASK [secrets : Record WireGuard public keys] **********************************
+    | ok: [lab-host]
+    | 
+    | TASK [secrets : Make sure secret files are private] ****************************
+    | ok: [lab-host] => (item=k3s-token)
+    | ok: [lab-host] => (item=redis-password)
+    | ok: [lab-host] => (item=haproxy-stats-password)
+    | ok: [lab-host] => (item=wg-a.key)
+    | ok: [lab-host] => (item=wg-b.key)
+    | ok: [lab-host] => (item=wg-c.key)
+    | 
+    | TASK [network : Build the router image] ****************************************
+    | ok: [lab-host]
+    | 
+    | TASK [network : Create the WAN / transit network] ******************************
+    | ok: [lab-host]
+    | 
+    | TASK [network : Create one LAN network per site] *******************************
+    | ok: [lab-host] => (item=site-a)
+    | ok: [lab-host] => (item=site-b)
+    | ok: [lab-host] => (item=site-c)
+    | 
+    | TASK [network : Create router config directories] ******************************
+    | ok: [lab-host] => (item=site-a)
+    | ok: [lab-host] => (item=site-b)
+    | ok: [lab-host] => (item=site-c)
+    | 
+    | TASK [network : Render router scripts] *****************************************
+    | ok: [lab-host] => (item=site-a)
+    | ok: [lab-host] => (item=site-b)
+    | ok: [lab-host] => (item=site-c)
+    | 
+    | TASK [network : Install router private keys] ***********************************
+    | ok: [lab-host] => (item=site-a)
+    | ok: [lab-host] => (item=site-b)
+    | ok: [lab-host] => (item=site-c)
+    | 
+    | TASK [network : Run the site routers] ******************************************
+    | ok: [lab-host] => (item=router-a)
+    | ok: [lab-host] => (item=router-b)
+    | ok: [lab-host] => (item=router-c)
+    | 
+    | TASK [network : Wait until every router reports ready] *************************
+    | ok: [lab-host] => (item=router-a)
+    | ok: [lab-host] => (item=router-b)
+    | ok: [lab-host] => (item=router-c)
+    | 
+    | PLAY [Deploy shared services] **************************************************
+    | 
+    | TASK [secrets : Create the secrets directory] **********************************
+    | ok: [lab-host]
+    | 
+    | TASK [secrets : Generate (or reuse) random secrets] ****************************
+    | ok: [lab-host]
+    | 
+    | TASK [secrets : Generate a WireGuard private key per site router (only if missing)] ***
+    | ok: [lab-host] => (item=router-a)
+    | ok: [lab-host] => (item=router-b)
+    | ok: [lab-host] => (item=router-c)
+    | 
+    | TASK [secrets : Derive WireGuard public keys] **********************************
+    | ok: [lab-host] => (item=router-a)
+    | ok: [lab-host] => (item=router-b)
+    | ok: [lab-host] => (item=router-c)
+    | 
+    | TASK [secrets : Record WireGuard public keys] **********************************
+    | ok: [lab-host]
+    | 
+    | TASK [secrets : Make sure secret files are private] ****************************
+    | ok: [lab-host] => (item=k3s-token)
+    | ok: [lab-host] => (item=redis-password)
+    | ok: [lab-host] => (item=haproxy-stats-password)
+    | ok: [lab-host] => (item=wg-a.key)
+    | ok: [lab-host] => (item=wg-b.key)
+    | ok: [lab-host] => (item=wg-c.key)
+    | 
+    | TASK [services : Create service config directories] ****************************
+    | ok: [lab-host] => (item={'dir': 'dns', 'mode': '0755'})
+    | ok: [lab-host] => (item={'dir': 'edge', 'mode': '0700'})
+    | 
+    | TASK [services : Render lab DNS configuration] *********************************
+    | ok: [lab-host] => (item=Corefile)
+    | ok: [lab-host] => (item=lab.internal.zone)
+    | 
+    | TASK [services : Run the lab DNS server] ***************************************
+    | ok: [lab-host]
+    | 
+    | TASK [services : Run the container image registry] *****************************
+    | ok: [lab-host]
+    | 
+    | TASK [services : Render edge load balancer configuration] **********************
+    | ok: [lab-host] => (item=haproxy.cfg)
+    | ok: [lab-host] => (item=edge.sh)
+    | 
+    | TASK [services : Validate the HAProxy configuration] ***************************
+    | ok: [lab-host]
+    | 
+    | TASK [services : Run the edge load balancer] ***********************************
+    | ok: [lab-host]
+    | 
+    | PLAY [Deploy the K3s cluster] **************************************************
+    | 
+    | TASK [Gathering Facts] *********************************************************
+    | ok: [lab-host]
+    | 
+    | TASK [secrets : Create the secrets directory] **********************************
+    | ok: [lab-host]
+    | 
+    | TASK [secrets : Generate (or reuse) random secrets] ****************************
+    | ok: [lab-host]
+    | 
+    | TASK [secrets : Generate a WireGuard private key per site router (only if missing)] ***
+    | ok: [lab-host] => (item=router-a)
+    | ok: [lab-host] => (item=router-b)
+    | ok: [lab-host] => (item=router-c)
+    | 
+    | TASK [secrets : Derive WireGuard public keys] **********************************
+    | ok: [lab-host] => (item=router-a)
+    | ok: [lab-host] => (item=router-b)
+    | ok: [lab-host] => (item=router-c)
+    | 
+    | TASK [secrets : Record WireGuard public keys] **********************************
+    | ok: [lab-host]
+    | 
+    | TASK [secrets : Make sure secret files are private] ****************************
+    | ok: [lab-host] => (item=k3s-token)
+    | ok: [lab-host] => (item=redis-password)
+    | ok: [lab-host] => (item=haproxy-stats-password)
+    | ok: [lab-host] => (item=wg-a.key)
+    | ok: [lab-host] => (item=wg-b.key)
+    | ok: [lab-host] => (item=wg-c.key)
+    | 
+    | TASK [k3s : Detect the VM's primary IP (added to the API certificate for Windows access)] ***
+    | ok: [lab-host]
+    | 
+    | TASK [k3s : Build the node list] ***********************************************
+    | ok: [lab-host] => (item=site-a)
+    | ok: [lab-host] => (item=site-b)
+    | ok: [lab-host] => (item=site-c)
+    | 
+    | TASK [k3s : Wait for the first server's API before adding more nodes] **********
+    | included: /home/saad/multi-site-ha-platform/ansible/roles/k3s/tasks/node.yml for lab-host
+    | 
+    | TASK [k3s : site-a-server | config directory] **********************************
+    | ok: [lab-host]
+    | 
+    | TASK [k3s : site-a-server | render configuration] ******************************
+    | ok: [lab-host] => (item=node.sh)
+    | ok: [lab-host] => (item=config.yaml)
+    | ok: [lab-host] => (item=registries.yaml)
+    | 
+    | TASK [k3s : site-a-server | cluster token] *************************************
+    | ok: [lab-host]
+    | 
+    | TASK [k3s : site-a-server | run node container] ********************************
+    | ok: [lab-host]
+    | 
+    | TASK [k3s : site-a-server | wait until the node is Ready] **********************
+    | ok: [lab-host]
+    | 
+    | TASK [k3s : Join the remaining servers (one at a time)] ************************
+    | included: /home/saad/multi-site-ha-platform/ansible/roles/k3s/tasks/node.yml for lab-host => (item=site-b-server)
+    | included: /home/saad/multi-site-ha-platform/ansible/roles/k3s/tasks/node.yml for lab-host => (item=site-c-server)
+    | 
+    | TASK [k3s : site-b-server | config directory] **********************************
+    | ok: [lab-host]
+    | 
+    | TASK [k3s : site-b-server | render configuration] ******************************
+    | ok: [lab-host] => (item=node.sh)
+    | ok: [lab-host] => (item=config.yaml)
+    | ok: [lab-host] => (item=registries.yaml)
+    | 
+    | TASK [k3s : site-b-server | cluster token] *************************************
+    | ok: [lab-host]
+    | 
+    | TASK [k3s : site-b-server | run node container] ********************************
+    | ok: [lab-host]
+    | 
+    | TASK [k3s : site-b-server | wait until the node is Ready] **********************
+    | ok: [lab-host]
+    | 
+    | TASK [k3s : site-c-server | config directory] **********************************
+    | ok: [lab-host]
+    | 
+    | TASK [k3s : site-c-server | render configuration] ******************************
+    | ok: [lab-host] => (item=node.sh)
+    | ok: [lab-host] => (item=config.yaml)
+    | ok: [lab-host] => (item=registries.yaml)
+    | 
+    | TASK [k3s : site-c-server | cluster token] *************************************
+    | ok: [lab-host]
+    | 
+    | TASK [k3s : site-c-server | run node container] ********************************
+    | ok: [lab-host]
+    | 
+    | TASK [k3s : site-c-server | wait until the node is Ready] **********************
+    | ok: [lab-host]
+    | 
+    | TASK [k3s : Join the agents] ***************************************************
+    | included: /home/saad/multi-site-ha-platform/ansible/roles/k3s/tasks/node.yml for lab-host => (item=site-a-agent)
+    | included: /home/saad/multi-site-ha-platform/ansible/roles/k3s/tasks/node.yml for lab-host => (item=site-b-agent)
+    | included: /home/saad/multi-site-ha-platform/ansible/roles/k3s/tasks/node.yml for lab-host => (item=site-c-agent)
+    | 
+    | TASK [k3s : site-a-agent | config directory] ***********************************
+    | ok: [lab-host]
+    | 
+    | TASK [k3s : site-a-agent | render configuration] *******************************
+    | ok: [lab-host] => (item=node.sh)
+    | ok: [lab-host] => (item=config.yaml)
+    | ok: [lab-host] => (item=registries.yaml)
+    | 
+    | TASK [k3s : site-a-agent | cluster token] **************************************
+    | ok: [lab-host]
+    | 
+    | TASK [k3s : site-a-agent | run node container] *********************************
+    | ok: [lab-host]
+    | 
+    | TASK [k3s : site-a-agent | wait until the node is Ready] ***********************
+    | ok: [lab-host]
+    | 
+    | TASK [k3s : site-b-agent | config directory] ***********************************
+    | ok: [lab-host]
+    | 
+    | TASK [k3s : site-b-agent | render configuration] *******************************
+    | ok: [lab-host] => (item=node.sh)
+    | ok: [lab-host] => (item=config.yaml)
+    | ok: [lab-host] => (item=registries.yaml)
+    | 
+    | TASK [k3s : site-b-agent | cluster token] **************************************
+    | ok: [lab-host]
+    | 
+    | TASK [k3s : site-b-agent | run node container] *********************************
+    | ok: [lab-host]
+    | 
+    | TASK [k3s : site-b-agent | wait until the node is Ready] ***********************
+    | ok: [lab-host]
+    | 
+    | TASK [k3s : site-c-agent | config directory] ***********************************
+    | ok: [lab-host]
+    | 
+    | TASK [k3s : site-c-agent | render configuration] *******************************
+    | ok: [lab-host] => (item=node.sh)
+    | ok: [lab-host] => (item=config.yaml)
+    | ok: [lab-host] => (item=registries.yaml)
+    | 
+    | TASK [k3s : site-c-agent | cluster token] **************************************
+    | ok: [lab-host]
+    | 
+    | TASK [k3s : site-c-agent | run node container] *********************************
+    | ok: [lab-host]
+    | 
+    | TASK [k3s : site-c-agent | wait until the node is Ready] ***********************
+    | ok: [lab-host]
+    | 
+    | TASK [k3s : Verify etcd is healthy on every server (etcd's own /health endpoint)] ***
+    | ok: [lab-host] => (item=site-a-server)
+    | ok: [lab-host] => (item=site-b-server)
+    | ok: [lab-host] => (item=site-c-server)
+    | 
+    | TASK [k3s : Fetch the admin kubeconfig] ****************************************
+    | ok: [lab-host]
+    | 
+    | TASK [k3s : Write kubeconfig for this VM (API through the edge load balancer)] ***
+    | ok: [lab-host]
+    | 
+    | TASK [k3s : Write kubeconfig for the Windows host (API through the VM's IP)] ***
+    | ok: [lab-host]
+    | 
+    | TASK [k3s : Cluster summary] ***************************************************
+    | ok: [lab-host]
+    | 
+    | TASK [k3s : Show nodes] ********************************************************
+    | ok: [lab-host] => {
+    |     "nodes_out.stdout_lines": [
+    |         "NAME            STATUS   ROLES                AGE     VERSION        INTERNAL-IP   EXTERNAL-IP   OS-IMAGE           KERNEL-VERSION             CONTAINER-RUNTIME",
+    |         "site-a-agent    Ready    <none>               6m12s   v1.37.2+k3s1   10.10.10.21   <none>        K3s v1.37.2+k3s1   7.0.0-44-generic (amd64)   containerd://2.3.7-k3s1",
+    |         "site-a-server   Ready    control-plane,etcd   7m47s   v1.37.2+k3s1   10.10.10.11   <none>        K3s v1.37.2+k3s1   7.0.0-44-generic (amd64)   containerd://2.3.7-k3s1",
+    |         "site-b-agent    Ready    <none>               5m58s   v1.37.2+k3s1   10.20.20.21   <none>        K3s v1.37.2+k3s1   7.0.0-44-generic (amd64)   containerd://2.3.7-k3s1",
+    |         "site-b-server   Ready    control-plane,etcd   7m10s   v1.37.2+k3s1   10.20.20.11   <none>        K3s v1.37.2+k3s1   7.0.0-44-generic (amd64)   containerd://2.3.7-k3s1",
+    |         "site-c-agent    Ready    <none>               5m44s   v1.37.2+k3s1   10.30.30.21   <none>        K3s v1.37.2+k3s1   7.0.0-44-generic (amd64)   containerd://2.3.7-k3s1",
+    |         "site-c-server   Ready    control-plane,etcd   6m30s   v1.37.2+k3s1   10.30.30.11   <none>        K3s v1.37.2+k3s1   7.0.0-44-generic (amd64)   containerd://2.3.7-k3s1"
+    |     ]
+    | }
+    | 
+    | PLAY [Deploy the platform layer and the demo application] **********************
+    | 
+    | TASK [secrets : Create the secrets directory] **********************************
+    | ok: [lab-host]
+    | 
+    | TASK [secrets : Generate (or reuse) random secrets] ****************************
+    | ok: [lab-host]
+    | 
+    | TASK [secrets : Generate a WireGuard private key per site router (only if missing)] ***
+    | ok: [lab-host] => (item=router-a)
+    | ok: [lab-host] => (item=router-b)
+    | ok: [lab-host] => (item=router-c)
+    | 
+    | TASK [secrets : Derive WireGuard public keys] **********************************
+    | ok: [lab-host] => (item=router-a)
+    | ok: [lab-host] => (item=router-b)
+    | ok: [lab-host] => (item=router-c)
+    | 
+    | TASK [secrets : Record WireGuard public keys] **********************************
+    | ok: [lab-host]
+    | 
+    | TASK [secrets : Make sure secret files are private] ****************************
+    | ok: [lab-host] => (item=k3s-token)
+    | ok: [lab-host] => (item=redis-password)
+    | ok: [lab-host] => (item=haproxy-stats-password)
+    | ok: [lab-host] => (item=wg-a.key)
+    | ok: [lab-host] => (item=wg-b.key)
+    | ok: [lab-host] => (item=wg-c.key)
+    | 
+    | TASK [platform : Platform manifests (namespaces, Traefik HA)] ******************
+    | included: /home/saad/multi-site-ha-platform/ansible/tasks/kubectl-apply.yml for lab-host
+    | 
+    | TASK [platform : Diff platform manifests against the cluster] ******************
+    | ok: [lab-host]
+    | 
+    | TASK [platform : Run CoreDNS with 3 replicas (K3s default is 1, a single point of failure for DNS)] ***
+    | ok: [lab-host]
+    | 
+    | TASK [platform : Check the image tag in kustomization.yaml matches app.version] ***
+    | ok: [lab-host]
+    | 
+    | TASK [platform : Hash the application source] **********************************
+    | ok: [lab-host]
+    | 
+    | TASK [platform : Look up the current SitePulse image] **************************
+    | ok: [lab-host]
+    | 
+    | TASK [platform : Check whether the lab registry already has this version] ******
+    | ok: [lab-host]
+    | 
+    | TASK [platform : Create or update the Redis password Secret (value from .secrets/)] ***
+    | ok: [lab-host]
+    | 
+    | TASK [platform : SitePulse application manifests] ******************************
+    | included: /home/saad/multi-site-ha-platform/ansible/tasks/kubectl-apply.yml for lab-host
+    | 
+    | TASK [platform : Diff sitepulse manifests against the cluster] *****************
+    | ok: [lab-host]
+    | 
+    | TASK [platform : Wait for Redis and SitePulse to become ready] *****************
+    | ok: [lab-host] => (item=statefulset/redis)
+    | ok: [lab-host] => (item=deployment/sitepulse)
+    | 
+    | TASK [platform : Wait for Traefik to run three replicas] ***********************
+    | ok: [lab-host]
+    | 
+    | TASK [platform : Wait until the application answers through the edge load balancer] ***
+    | ok: [lab-host]
+    | 
+    | PLAY [Deploy monitoring] *******************************************************
+    | 
+    | TASK [secrets : Create the secrets directory] **********************************
+    | ok: [lab-host]
+    | 
+    | TASK [secrets : Generate (or reuse) random secrets] ****************************
+    | ok: [lab-host]
+    | 
+    | TASK [secrets : Generate a WireGuard private key per site router (only if missing)] ***
+    | ok: [lab-host] => (item=router-a)
+    | ok: [lab-host] => (item=router-b)
+    | ok: [lab-host] => (item=router-c)
+    | 
+    | TASK [secrets : Derive WireGuard public keys] **********************************
+    | ok: [lab-host] => (item=router-a)
+    | ok: [lab-host] => (item=router-b)
+    | ok: [lab-host] => (item=router-c)
+    | 
+    | TASK [secrets : Record WireGuard public keys] **********************************
+    | ok: [lab-host]
+    | 
+    | TASK [secrets : Make sure secret files are private] ****************************
+    | ok: [lab-host] => (item=k3s-token)
+    | ok: [lab-host] => (item=redis-password)
+    | ok: [lab-host] => (item=haproxy-stats-password)
+    | ok: [lab-host] => (item=wg-a.key)
+    | ok: [lab-host] => (item=wg-b.key)
+    | ok: [lab-host] => (item=wg-c.key)
+    | 
+    | TASK [monitoring : Platform manifests (the monitoring namespace)] **************
+    | included: /home/saad/multi-site-ha-platform/ansible/tasks/kubectl-apply.yml for lab-host
+    | 
+    | TASK [monitoring : Diff platform manifests against the cluster] ****************
+    | ok: [lab-host]
+    | 
+    | TASK [monitoring : Monitoring manifests] ***************************************
+    | included: /home/saad/multi-site-ha-platform/ansible/tasks/kubectl-apply.yml for lab-host
+    | 
+    | TASK [monitoring : Diff monitoring manifests against the cluster] **************
+    | ok: [lab-host]
+    | 
+    | TASK [monitoring : Wait for the monitoring stack] ******************************
+    | ok: [lab-host] => (item=kube-state-metrics)
+    | ok: [lab-host] => (item=prometheus)
+    | 
+    | TASK [monitoring : Wait until Prometheus answers through the edge load balancer] ***
+    | ok: [lab-host]
+    | 
+    | PLAY RECAP *********************************************************************
+    | lab-host                   : ok=109  changed=0    unreachable=0    failed=0    skipped=8    rescued=0    ignored=0   
+    | 
+    | total changed=0
+PASS|RB-07|application data restored from backup (counter back to >= 21)|0.52s
+    | Restore 'data' from backups/20261121-111325
+    |   restored sitepulse:visits = 21
+    | Restore complete.
+    | restored=21
+# finished=2026-11-21T11:22:59-06:00 pass=7 fail=0

@@ -35,7 +35,7 @@ flowchart LR
 | **Monitoring** | **Prometheus** (kubelet, cAdvisor, etcd, kube-state-metrics, app, HAProxy) with alert rules; HAProxy statistics page |
 | **Security** | RBAC least privilege, Pod Security *restricted*, NetworkPolicies, Secrets encrypted at rest, generated secrets never committed |
 | **Automation** | **Ansible** roles + **Make** targets + **Kustomize**; idempotent; one-command deploy, rebuild, backup and restore |
-| **Testing** | 22 network checks, 31 platform checks, 8 failure scenarios with availability probes, and a rebuild-from-code test |
+| **Testing** | 27 network checks, 31 platform checks, 8 failure scenarios with availability probes, backup/restore and rebuild-from-code tests (results: [docs/TEST_REPORT.md](docs/TEST_REPORT.md)) |
 
 ## Quick start
 
