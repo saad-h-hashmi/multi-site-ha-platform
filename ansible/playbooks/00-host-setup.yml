@@ -6,6 +6,10 @@
   hosts: lab-host
   become: true
   vars:
+    # Ubuntu 25.10+ ships sudo-rs as the default `sudo`. Its password prompt does not
+    # follow Ansible's custom prompt, so Ansible times out waiting for it. Use the
+    # classic sudo (installed as sudo.ws) when it is available.
+    ansible_become_exe: "{{ '/usr/bin/sudo.ws' if '/usr/bin/sudo.ws' is file else 'sudo' }}"
     lab_user: "{{ lookup('env', 'SUDO_USER') | default(lookup('env', 'USER'), true) }}"
   roles:
     - host_setup

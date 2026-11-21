@@ -34,6 +34,13 @@
     groups: docker
     append: true
 
+# Group membership only applies after the next login. This ACL gives the same
+# access to the already-open session right away; it disappears on the next
+# Docker restart or reboot, by which time the group membership is active.
+- name: Grant {{ lab_user }} immediate access to the Docker socket for this session
+  ansible.builtin.command: setfacl -m "u:{{ lab_user }}:rw" /run/docker.sock
+  changed_when: false
+
 - name: Load kernel modules needed by WireGuard and Kubernetes networking
   community.general.modprobe:
     name: "{{ item }}"
