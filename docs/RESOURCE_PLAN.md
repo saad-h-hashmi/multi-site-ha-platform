@@ -21,10 +21,10 @@ The pods' memory counts inside their node containers' limits:
 |---|---|---|
 | SitePulse app | 3 | 96 MiB |
 | Redis | 1 | 128 MiB |
-| Prometheus | 1 | 384 MiB |
-| Grafana | 1 | 192 MiB |
+| Prometheus | 1 | 512 MiB (about 110 MiB used after metric filtering) |
+| Traefik | 3 | 128 MiB |
 | kube-state-metrics | 1 | 96 MiB |
-| K3s system pods (CoreDNS, Traefik, metrics-server, local-path) | – | ~350 MiB in total |
+| K3s system pods (CoreDNS ×3, metrics-server, local-path) | – | ~200 MiB in total |
 
 **Expected steady state:** about 3.0–4.0 GiB actually used. The container limits add up to more than RAM on purpose: they are ceilings to stop one runaway node, not reservations.
 
@@ -47,11 +47,11 @@ Two vCPUs are shared by everything. Three etcd members plus three API servers ar
 | etcd + K3s state (3 servers) | ~300 MB |
 | Alpine, HAProxy, CoreDNS, registry images | ~100 MB |
 | Python base + SitePulse image, Redis | ~100 MB, plus copies on the nodes that run them |
-| Prometheus, Grafana, kube-state-metrics | ~550 MB, pinned to the agents |
+| Prometheus, kube-state-metrics | ~150 MB, steered to one preferred node (Grafana, ~700 MB per node, was removed: see AD-11) |
 | Logs (capped at 10 MB × 2 per container) | < 300 MB |
 | **Total** | **≈ 2.5–3.0 GB** |
 
-That leaves about 3 GB free on `/`. Monitoring is a separate `make` target, so it can be skipped if disk becomes critical. `make clean` removes every lab container, network and volume. `make prune-images` removes the downloaded images too.
+That leaves about 3 GB free on `/`. Monitoring is a separate `make` target, so it can be skipped if disk becomes critical. `make clean` removes every lab container, network and volume. `make clean-all` also removes the generated secrets and the downloaded images.
 
 ## 4. Network ports published on the host
 
@@ -60,8 +60,7 @@ That leaves about 3 GB free on `/`. Monitoring is a separate `make` target, so i
 | 8080 | Demo application (HTTP via HAProxy → Traefik) | `0.0.0.0`, reachable from the Windows host over the VMware NAT network only |
 | 6443 | Kubernetes API (via HAProxy) | `0.0.0.0` (TLS + client certificates) |
 | 8404 | HAProxy statistics | `0.0.0.0` (read-only, password-protected) |
-| 3000 | Grafana | `0.0.0.0` (password-protected) |
-| 9090 | Prometheus | `127.0.0.1` |
+| 9090 | Prometheus web UI | `127.0.0.1` |
 | 5000 | Image registry (push) | `127.0.0.1` |
 
 The bind address is configurable with `edge.bind_address` in `config/lab.yml`. Setting it to `127.0.0.1` limits every service to the VM itself.

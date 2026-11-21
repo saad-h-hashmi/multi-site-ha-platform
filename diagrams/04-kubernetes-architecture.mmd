@@ -23,6 +23,6 @@ flowchart TB
     P["Prometheus"] ; KSM["kube-state-metrics"]
   end
   subgraph KS["kube-system"]
-    T["Traefik x2 (ServiceLB on every node :80)"]; DNSK["CoreDNS x3"]; MS["metrics-server"]; LP["local-path provisioner"]
+    T["Traefik x3, one per site (hostPort 80 on its node)"]; DNSK["CoreDNS x3"]; MS["metrics-server"]; LP["local-path provisioner"]
   end
   T --> ING

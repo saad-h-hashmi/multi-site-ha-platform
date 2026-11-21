@@ -37,7 +37,7 @@ flowchart TB
   end
   subgraph K8S["Kubernetes workloads (spread across sites)"]
     APP["SitePulse x3"] --> REDIS["Redis + PersistentVolume"]
-    TR["Traefik ingress x2"] --> APP
+    TR["Traefik ingress x3 (one per site, hostPort 80)"] --> APP
     PROM["Prometheus + kube-state-metrics"]
   end
   EDGE -.->|"ingress :80 / API :6443"| K8S
@@ -118,7 +118,7 @@ flowchart TB
     P["Prometheus"] ; KSM["kube-state-metrics"]
   end
   subgraph KS["kube-system"]
-    T["Traefik x2 (ServiceLB on every node :80)"]; DNSK["CoreDNS x3"]; MS["metrics-server"]; LP["local-path provisioner"]
+    T["Traefik x3, one per site (hostPort 80 on its node)"]; DNSK["CoreDNS x3"]; MS["metrics-server"]; LP["local-path provisioner"]
   end
   T --> ING
 ```
@@ -148,9 +148,8 @@ Source: [`diagrams/06-high-availability.mmd`](../diagrams/06-high-availability.m
 ```mermaid
 flowchart LR
   U["Client"] --> E["Edge HAProxy<br/>(single instance: lab SPOF)"]
-  E -->|"health-checked, retry + redispatch"| N1["6 node backends :80"]
-  N1 --> T1["Traefik replica (site X)"] & T2["Traefik replica (site Y)"]
-  T1 & T2 -->|"retry middleware, 1 s dial timeout"| P1["SitePulse site A"] & P2["SitePulse site B"] & P3["SitePulse site C"]
+  E -->|"health-checked, 500 ms connect, 3 retries + redispatch"| T1["Traefik site A :80"] & T2["Traefik site B :80"] & T3["Traefik site C :80"]
+  T1 & T2 & T3 -->|"retry middleware, 500 ms dial timeout"| P1["SitePulse site A"] & P2["SitePulse site B"] & P3["SitePulse site C"]
   P1 & P2 & P3 --> R["Redis (1 replica + PV)<br/>app degrades gracefully if down"]
   E -->|"TCP checks"| API1["API site A"] & API2["API site B"] & API3["API site C"]
   API1 & API2 & API3 --- ETCD["etcd Raft: tolerates 1 member loss"]

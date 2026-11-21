@@ -30,7 +30,7 @@ flowchart LR
 | Router | router-a: WireGuard, routing, firewall, NAT | router-b | router-c |
 | Control plane | site-a-server: K3s server (API, scheduler, controllers) + **etcd member** | site-b-server + etcd member | site-c-server + etcd member |
 | Worker | site-a-agent: kubelet + containerd | site-b-agent | site-c-agent |
-| Workloads (normal state) | 1 SitePulse replica, Traefik/CoreDNS replicas as scheduled | 1 SitePulse replica | 1 SitePulse replica |
+| Workloads (normal state) | 1 SitePulse replica, 1 Traefik, 1 CoreDNS | 1 SitePulse replica, 1 Traefik, 1 CoreDNS | 1 SitePulse replica, 1 Traefik, 1 CoreDNS |
 
 Shared services sit on the WAN segment, like services in a provider or cloud network: the **edge load balancer** (HAProxy), the **lab DNS** (CoreDNS) and the **image registry**. Single-instance stateful parts are placed by the scheduler: **Redis** (with its persistent volume) and **Prometheus**.
 
@@ -53,15 +53,13 @@ sequenceDiagram
   participant U as Browser (Windows host)
   participant E as edge HAProxy :8080
   participant R as site router
-  participant N as any node :80 (ServiceLB)
-  participant T as Traefik (2 replicas)
+  participant T as Traefik :80 (hostPort, 1 per site)
   participant P as SitePulse pod (3 replicas)
   participant D as Redis (PV)
   U->>E: GET http://192.168.30.128:8080/
-  Note over E: picks a healthy node<br/>(HTTP /readyz check every 2 s)
+  Note over E: picks a healthy Traefik node<br/>(HTTP /readyz check every 2 s)
   E->>R: route to 10.x.x.x via that site's router
-  R->>N: firewall allows edge -> tcp/80
-  N->>T: Service traefik
+  R->>T: firewall allows edge -> tcp/80
   T->>P: Ingress sitepulse.lab.internal -> Service sitepulse<br/>(may cross sites over Flannel VXLAN inside WireGuard)
   P->>D: redis.sitepulse.svc (cluster DNS)
   P-->>U: page shows pod, node, site, edge backend
@@ -83,8 +81,8 @@ sequenceDiagram
 | Replicated workload | 3 SitePulse replicas spread across zones (`topologySpreadConstraints`, `maxSkew: 1`) | One replica per site; losing a site loses one replica |
 | Fast failure handling | Node marked NotReady after 20 s; pods evicted after a 30 s toleration (defaults are 40 s and 300 s) | Replacement pods start on surviving sites within about a minute |
 | Health checks | Startup, readiness (`/readyz`) and liveness (`/healthz`) probes | Broken pods leave the Service; hung pods are restarted |
-| Redundant ingress and DNS | Traefik 2 replicas in different sites; CoreDNS 3 replicas | No single node holds the only ingress or DNS server |
-| Retries | HAProxy `retry-on` + `redispatch`; Traefik retry middleware with a 1 s dial timeout | Requests that hit a just-failed node are retried elsewhere |
+| Redundant ingress and DNS | Traefik 3 replicas, one per site, listening on hostPort 80 (the edge health-checks each Traefik directly); CoreDNS 3 replicas | No single node holds the only ingress or DNS server; a dead ingress node is removed from the edge pool in about 4 s |
+| Retries | HAProxy 500 ms connect timeout, 3 retries with `redispatch`; Traefik retry middleware with a 500 ms dial timeout | Requests that hit a just-failed node are retried elsewhere |
 | Disruption budget | `PodDisruptionBudget minAvailable: 2` | Voluntary operations such as drains keep 2 replicas serving |
 
 Detailed behaviour and the measured results are in [HIGH_AVAILABILITY_DESIGN.md](HIGH_AVAILABILITY_DESIGN.md) and [TEST_REPORT.md](TEST_REPORT.md).

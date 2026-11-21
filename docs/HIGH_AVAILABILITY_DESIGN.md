@@ -19,11 +19,11 @@
 | Layer | Redundancy | Tolerates | Single points of failure that remain |
 |---|---|---|---|
 | Inter-site network | Full mesh of 3 WireGuard tunnels | The loss of any one site's router (only that site is cut off) | The host bridge `msha-wan` (one software bridge) |
-| Edge entry point | 1 HAProxy; health-checks 3 API servers and 6 ingress nodes | Any backend failure | **The HAProxy container itself** (see §6) |
+| Edge entry point | 1 HAProxy; health-checks 3 API servers and the 3 Traefik ingress nodes | Any backend failure | **The HAProxy container itself** (see §6) |
 | Kubernetes API | 3 API servers behind the edge; agents load-balance on the client side | 1 server down | — |
 | Cluster state (etcd) | 3 members, Raft consensus, one per site | 1 member down (quorum = 2) | — |
 | Cluster DNS | CoreDNS 3 replicas | Node and site loss | — |
-| Ingress | Traefik 2 replicas in different sites; exposed on all 6 nodes | 1 replica, node or site down | — |
+| Ingress | Traefik 3 replicas, one per site, each on hostPort 80; PDB `minAvailable: 2` | 1 replica, node or site down | — |
 | Application | SitePulse 3 replicas, one per site, PDB `minAvailable: 2` | 1 site down with no lost capacity after rescheduling; 2 replicas lost while still serving | — |
 | Application data | Redis 1 replica on a local PersistentVolume | Pod restarts (data on the PV) | **Redis's node**: the counter is unavailable until that node returns (the web tier keeps serving) |
 | Monitoring | Prometheus 1 replica | Pod restarts | Its node (monitoring is not on the request path) |
@@ -46,8 +46,8 @@ With one etcd member per site, the cluster survives the loss of **any one site**
 | Setting | Value | Default | Effect |
 |---|---|---|---|
 | HAProxy health check | every 2 s, DOWN after 2 failures | — | A dead node or API server leaves the edge pool in about 4 s |
-| HAProxy `timeout connect` / `retries` / `redispatch` | 1 s / 2 / on | 5 s / 3 / off | A request that hits a dying backend is retried on another node |
-| Traefik dial timeout + retry middleware | 1 s, 3 attempts | 30 s, none | A request sent to a pod on a dead node is retried on a live replica |
+| HAProxy `timeout connect` / `retries` / `redispatch` | 500 ms / 3 / on | none / 3 / off | A request that hits a dying backend is retried on another node |
+| Traefik dial timeout + retry middleware | 500 ms, 3 attempts | 30 s, none | A request sent to a pod on a dead node is retried on a live replica |
 | `node-monitor-grace-period` | 20 s | 40–50 s | A failed node becomes NotReady sooner |
 | `default-unreachable/not-ready-toleration-seconds` and pod tolerations | 30 s | 300 s | Pods are rescheduled about 30 s after NotReady instead of 5 minutes |
 | Readiness probe | every 3 s, 2 failures | — | A broken pod leaves the Service in about 6 s |

@@ -1,0 +1,5 @@
+8s          Normal    Pulled      pod/sitepulse-75fdb9c6d9-8n4k7   Container image "172.30.0.50:5000/sitepulse:1.2.0" already present on machine and can be accessed by the pod
+8s          Normal    Created     pod/sitepulse-75fdb9c6d9-8n4k7   Container created
+8s          Normal    Started     pod/sitepulse-75fdb9c6d9-8n4k7   Container started
+7s          Warning   Unhealthy   pod/sitepulse-75fdb9c6d9-8n4k7   Readiness probe failed: Get "http://10.42.2.27:8000/readyz": dial tcp 10.42.2.27:8000: connect: connection refused
+7s          Warning   Unhealthy   pod/sitepulse-75fdb9c6d9-8n4k7   Liveness probe failed: Get "http://10.42.2.27:8000/healthz": dial tcp 10.42.2.27:8000: connect: connection refused

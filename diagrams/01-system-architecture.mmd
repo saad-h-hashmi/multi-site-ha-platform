@@ -23,7 +23,7 @@ flowchart TB
   end
   subgraph K8S["Kubernetes workloads (spread across sites)"]
     APP["SitePulse x3"] --> REDIS["Redis + PersistentVolume"]
-    TR["Traefik ingress x2"] --> APP
+    TR["Traefik ingress x3 (one per site, hostPort 80)"] --> APP
     PROM["Prometheus + kube-state-metrics"]
   end
   EDGE -.->|"ingress :80 / API :6443"| K8S

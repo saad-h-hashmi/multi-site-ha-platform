@@ -1,7 +1,7 @@
 # =============================================================================
 # Edge load balancer (HAProxy). Rendered by Ansible; do not edit by hand.
 #  :6443  Kubernetes API   -> 3 K3s servers (one per site), TCP health checks
-#  :8080  SitePulse app    -> Traefik ingress on all 6 nodes, HTTP readiness checks
+#  :8080  SitePulse app    -> Traefik (hostPort 80, one per site), HTTP readiness checks
 #  :9090  Prometheus       -> Traefik ingress (Host: prometheus.{{ dns.zone }})
 #  :8404  statistics page (password protected)
 #  :8405  Prometheus metrics for HAProxy itself (lab-internal, not published)
