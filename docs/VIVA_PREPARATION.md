@@ -53,7 +53,7 @@ A plain-language guide for both group members (Saad Hussain Hashmi, Sadia Alla D
 4. **App:** Ansible builds the image, pushes it to the registry, creates the Redis password Secret, and applies the manifests.
 5. **Request path:** browser → HAProxy (healthy node) → router → node:80 → Traefik → SitePulse pod (any site) → Redis.
 
-## 5. How high availability works (with my numbers)
+## 5. How high availability works (with our measured numbers)
 
 Use the measured values from [TEST_REPORT.md](TEST_REPORT.md) and be ready to show `evidence/failover/`.
 
