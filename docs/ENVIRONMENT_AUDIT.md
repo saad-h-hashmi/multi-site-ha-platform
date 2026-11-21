@@ -78,11 +78,11 @@ inotify limits are `max_user_instances=128`, which is too low for six kubelets o
 |---|---|
 | Remote | `origin` → `https://github.com/saad-h-hashmi/multi-site-ha-platform.git` (HTTPS) |
 | Branch | `main`, tracking `origin/main` |
-| History | 1 commit: `ea9cb7e Add complete master project brief` |
-| Files | `README.md` (725-line master brief) |
+| History | 1 commit, containing the assignment brief as `README.md` |
+| Files | `README.md` (assignment brief and project requirements) |
 | Push credentials | **None configured** (no `gh` CLI, no SSH keys, no credential helper). Commits are made locally; pushing needs the owner's GitHub login |
 
-The original brief was preserved byte-for-byte as `PROJECT_BRIEF.md` before any other change, as the brief instructs.
+The assignment statement is quoted at the top of the project README, which replaced the initial brief.
 
 ## 8. Conclusions that drive the design
 

@@ -26,7 +26,7 @@ cp "$ROOT"/diagrams/*.mmd "$ROOT"/diagrams/*.svg "$S/diagrams/"
 # Rewrite links so the package works on its own: diagrams point at the copies in
 # submission/diagrams/; other document links point back into the repository's docs/.
 for f in "$S"/*.md; do
-  sed -i -E 's#\]\((\.\./)?diagrams/#](diagrams/#g; s#\]\((docs/)?([A-Z_]+\.md)#](../docs/\2#g; s#\]\(\.\./docs/(PROJECT_BRIEF|FINAL_STATUS|PROJECT_PROGRESS|README)\.md#](../\1.md#g' "$f"
+  sed -i -E 's#\]\((\.\./)?diagrams/#](diagrams/#g; s#\]\((docs/)?([A-Z_]+\.md)#](../docs/\2#g; s#\]\(\.\./docs/(FINAL_STATUS|PROJECT_PROGRESS|README)\.md#](../\1.md#g' "$f"
 done
 # the diagrams document sits next to its sources: ../diagrams/x -> x
 sed -i -E 's#\]\(\.\./diagrams/#](#g; s#\]\(\.\./evidence/#](../evidence/#g' "$S"/diagrams/*.md

@@ -4,7 +4,7 @@ A resilient **three-site network** and a **Kubernetes platform** that is deploye
 
 > **Lab scope.** The three sites are simulated on a single Ubuntu VM: separate networks, routers, firewalls and encrypted tunnels, but one physical machine. The platform demonstrates the *mechanisms* of multi-site high availability (routing, quorum, health checks, failover, partitions), not protection against a real site or hardware failure. See [docs/HIGH_AVAILABILITY_DESIGN.md](../docs/HIGH_AVAILABILITY_DESIGN.md).
 
-The original assignment brief and project specification are preserved in [PROJECT_BRIEF.md](../PROJECT_BRIEF.md).
+**Assignment (Part 1):** *"Build a Multi-Site, Fully Automated, Highly Available Platform. Goal: Create a resilient multi-site network and a Kubernetes-based platform that is deployed and rebuilt entirely from code."* No further specifications or marking criteria were given; the design decisions and assumptions are recorded in [docs/ARCHITECTURE_DECISIONS.md](../docs/ARCHITECTURE_DECISIONS.md).
 
 ---
 

@@ -21,7 +21,7 @@ Status labels: **VERIFIED** (executed and passed), **FAILED** (executed and fail
 
 ## Log (2026-11-21)
 
-1. **Audit.** 2 vCPU, 9 GiB RAM, 6.3 GB free disk, no nested virtualisation, Apache on :80, Docker/kubectl missing, sudo needs a password. Brief preserved as `PROJECT_BRIEF.md`.
+1. **Audit.** 2 vCPU, 9 GiB RAM, 6.3 GB free disk, no nested virtualisation, Apache on :80, Docker/kubectl missing, sudo needs a password. Assignment requirements reviewed.
 2. **Bootstrap.** Ansible timed out on Ubuntu 26.04's `sudo-rs`. Fixed by using `sudo.ws`.
 3. **Network.** Routers, WireGuard mesh and firewall built. Routed packets were dropped by Docker 29 anti-spoofing rules because of host `bridge-nf-call-iptables=1`. Fixed with a per-namespace host sysctl after rejecting `nat-unprotected` (it broke isolation). 22/22 network tests.
 4. **Services + K3s.** DNS replies were lost to an asymmetric path, fixed with router SNAT to the WAN. Cluster up: 3 servers + 3 agents, etcd healthy.
