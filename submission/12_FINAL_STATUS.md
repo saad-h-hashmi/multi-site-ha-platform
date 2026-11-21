@@ -1,6 +1,6 @@
 # Final Status
 
-**Group:** Saad Hussain Hashmi (70154663), Sadia Alla Dita (70154570), University of Lahore
+**Group:** Saad Hussain Hashmi (70154663), Sadia Alla Dita (70154570) · University of Lahore, Department of Technology · Instructor: Ms. Sana
 
 **Date:** 2026-11-21 · **Host:** Ubuntu 26.04.1 VM (VMware), 2 vCPU, 9 GiB RAM, 20 GB disk · **Repository:** https://github.com/saad-h-hashmi/multi-site-ha-platform
 
@@ -114,7 +114,7 @@ Other commands:
 
 | What | Location |
 |---|---|
-| Final report | `docs/PROJECT_REPORT.md`, copy at `submission/01_PROJECT_REPORT.md` (instructor and department still to be filled in) |
+| Final report | `docs/PROJECT_REPORT.md`, copy at `submission/01_PROJECT_REPORT.md` |
 | Test report | `docs/TEST_REPORT.md` |
 | Evidence | `evidence/tests/` (per-suite logs), `evidence/failover/<run>/` (probe logs, summaries) |
 | Submission package | `submission/` (regenerate with `make submission`) |

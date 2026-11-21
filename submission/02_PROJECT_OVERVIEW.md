@@ -10,7 +10,7 @@ The original assignment brief and project specification are preserved in [PROJEC
 
 ## Project team
 
-Group project, University of Lahore. Submitted 21 November 2026.
+Group project, University of Lahore, Department of Technology. Instructor: Ms. Sana. Submitted 21 November 2026.
 
 | Name | Registration number |
 |---|---|

@@ -5,8 +5,8 @@
 | **Course** | System and Network Administration: Part 1 |
 | **Project type** | Group project |
 | **Group members** | Saad Hussain Hashmi (Reg. No. 70154663)<br>Sadia Alla Dita (Reg. No. 70154570) |
-| **Instructor** | `[INSTRUCTOR NAME]` |
-| **University / Department** | University of Lahore, `[DEPARTMENT]` |
+| **Instructor** | Ms. Sana |
+| **University / Department** | University of Lahore, Department of Technology |
 | **Submission date** | 21 November 2026 |
 | **Repository** | https://github.com/saad-h-hashmi/multi-site-ha-platform |
 
