@@ -1,0 +1,91 @@
+---
+# Phase 3: build the three-site network.
+#   WAN (provider) bridge + one LAN bridge per site + one router per site.
+- name: Build the router image
+  community.docker.docker_image_build:
+    name: "{{ project_name }}/router"
+    tag: "1.0"
+    path: "{{ project_root }}/infrastructure/router"
+    rebuild: never
+
+- name: Create the WAN / transit network
+  community.docker.docker_network:
+    name: "{{ wan.name }}"
+    driver: bridge
+    ipam_config:
+      - subnet: "{{ wan.subnet }}"
+        gateway: "{{ wan.gateway }}"
+    labels: { project: "{{ project_name }}", role: wan }
+
+- name: Create one LAN network per site
+  community.docker.docker_network:
+    name: "{{ project_name }}-{{ item.name }}-lan"
+    driver: bridge
+    driver_options:
+      com.docker.network.driver.mtu: "{{ wireguard.mtu }}"   # leave room for tunnel headers
+    ipam_config:
+      - subnet: "{{ item.lan_subnet }}"
+        gateway: "{{ item.lan_gateway_host }}"
+    labels: { project: "{{ project_name }}", role: site-lan, site: "{{ item.name }}" }
+  loop: "{{ sites }}"
+  loop_control: { label: "{{ item.name }}" }
+
+- name: Create router config directories
+  ansible.builtin.file:
+    path: "{{ build_dir }}/routers/{{ item.name }}"
+    state: directory
+    mode: "0700"
+  loop: "{{ sites }}"
+  loop_control: { label: "{{ item.name }}" }
+
+- name: Render router scripts
+  ansible.builtin.template:
+    src: router.sh.j2
+    dest: "{{ build_dir }}/routers/{{ site.name }}/router.sh"
+    mode: "0755"
+  loop: "{{ sites }}"
+  loop_control: { loop_var: site, label: "{{ site.name }}" }
+  register: router_scripts
+
+- name: Install router private keys
+  ansible.builtin.copy:
+    src: "{{ secrets_dir }}/wg-{{ item.id }}.key"
+    dest: "{{ build_dir }}/routers/{{ item.name }}/wg-private.key"
+    mode: "0600"
+  loop: "{{ sites }}"
+  loop_control: { label: "{{ item.name }}" }
+  register: router_keys
+
+- name: Run the site routers
+  community.docker.docker_container:
+    name: "{{ project_name }}-router-{{ item.id }}"
+    hostname: "router-{{ item.id }}"
+    image: "{{ project_name }}/router:1.0"
+    restart_policy: unless-stopped
+    capabilities: [NET_ADMIN]
+    sysctls:
+      net.ipv4.ip_forward: "1"
+      net.ipv4.conf.all.rp_filter: "0"
+    memory: 32m
+    volumes: ["{{ build_dir }}/routers/{{ item.name }}:/lab:ro"]
+    networks:
+      - name: "{{ project_name }}-{{ item.name }}-lan"
+        ipv4_address: "{{ item.router_lan_ip }}"
+      - name: "{{ wan.name }}"
+        ipv4_address: "{{ item.router_wan_ip }}"
+    networks_cli_compatible: true
+    labels: { project: "{{ project_name }}", role: router, site: "{{ item.name }}" }
+    # recreate the router only when its rendered script or key changed
+    recreate: "{{ router_scripts.results[idx].changed or router_keys.results[idx].changed }}"
+  loop: "{{ sites }}"
+  loop_control: { label: "router-{{ item.id }}", index_var: idx }
+
+- name: Wait until every router reports ready
+  ansible.builtin.command: docker logs {{ project_name }}-router-{{ item.id }}
+  register: router_log
+  until: "'ready:' in router_log.stdout"
+  retries: 15
+  delay: 2
+  changed_when: false
+  loop: "{{ sites }}"
+  loop_control: { label: "router-{{ item.id }}" }

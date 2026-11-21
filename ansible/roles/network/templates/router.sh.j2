@@ -1,0 +1,90 @@
+#!/bin/sh
+# =============================================================================
+# Router for {{ site.description }}. Rendered by Ansible; do not edit by hand.
+# Runs as PID 1 in the router container: configures interfaces, WireGuard,
+# routes and firewall, then stays in the foreground.
+# =============================================================================
+set -eu
+log() { echo "[router-{{ site.id }}] $*"; }
+
+# Docker does not guarantee interface names, so find them by address.
+iface_for() { ip -o -4 addr show | awk -v ip="$1" '$4 ~ "^"ip"/" {print $2; exit}'; }
+LAN_IF=$(iface_for {{ site.router_lan_ip }})
+WAN_IF=$(iface_for {{ site.router_wan_ip }})
+[ -n "$LAN_IF" ] && [ -n "$WAN_IF" ] || { log "interfaces not found"; ip -br addr; exit 1; }
+log "LAN=$LAN_IF ({{ site.router_lan_ip }})  WAN=$WAN_IF ({{ site.router_wan_ip }})"
+
+# ---- Default route: internet egress via the WAN (provider) gateway ----------
+ip route replace default via {{ wan.gateway }} dev "$WAN_IF"
+
+# ---- WireGuard full mesh to the other two sites ----------------------------
+ip link del wg0 2>/dev/null || true
+ip link add wg0 type wireguard
+wg set wg0 listen-port {{ wireguard.port }} private-key /lab/wg-private.key
+{% for peer in sites if peer.id != site.id %}
+wg set wg0 peer {{ wg_public_keys[peer.id] }} \
+  endpoint {{ peer.router_wan_ip }}:{{ wireguard.port }} \
+  allowed-ips {{ peer.router_wg_ip }}/32,{{ peer.site_prefix }} \
+  persistent-keepalive 15
+{% endfor %}
+ip addr add {{ site.router_wg_ip }}/24 dev wg0
+ip link set wg0 mtu {{ wireguard.mtu }} up
+
+# Static routes to the other sites, through the encrypted tunnel
+{% for peer in sites if peer.id != site.id %}
+ip route replace {{ peer.site_prefix }} dev wg0   # {{ peer.description }}
+{% endfor %}
+
+# ---- Firewall ------------------------------------------------------------------
+# Default deny on forwarded and inbound traffic; only listed flows are allowed.
+iptables -F; iptables -X; iptables -t nat -F
+iptables -P INPUT DROP
+iptables -P FORWARD DROP
+iptables -P OUTPUT ACCEPT
+
+# Router itself: loopback, replies, ping, WireGuard from peer routers only
+iptables -A INPUT -i lo -j ACCEPT
+iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+iptables -A INPUT -p icmp -j ACCEPT
+{% for peer in sites if peer.id != site.id %}
+iptables -A INPUT -i "$WAN_IF" -p udp -s {{ peer.router_wan_ip }} --dport {{ wireguard.port }} -j ACCEPT
+{% endfor %}
+
+# Clamp TCP MSS so full-size packets fit through the tunnel
+iptables -t mangle -F
+iptables -t mangle -A FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
+
+iptables -A FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+iptables -A FORWARD -p icmp -j ACCEPT
+
+# Site <-> site (over wg0): only the ports the Kubernetes cluster needs
+iptables -N SITE_TO_SITE
+iptables -A SITE_TO_SITE -p tcp --dport 6443 -m comment --comment "K3s API / supervisor" -j ACCEPT
+iptables -A SITE_TO_SITE -p tcp --dport 2379:2380 -m comment --comment "etcd client+peer" -j ACCEPT
+iptables -A SITE_TO_SITE -p tcp --dport 10250 -m comment --comment "kubelet" -j ACCEPT
+iptables -A SITE_TO_SITE -p udp --dport 8472 -m comment --comment "Flannel VXLAN" -j ACCEPT
+iptables -A SITE_TO_SITE -m comment --comment "deny other inter-site traffic" -j DROP
+iptables -A FORWARD -i "$LAN_IF" -o wg0 -j SITE_TO_SITE
+iptables -A FORWARD -i wg0 -o "$LAN_IF" -j SITE_TO_SITE
+
+# Edge load balancer -> this site's nodes (published services only)
+iptables -A FORWARD -i "$WAN_IF" -o "$LAN_IF" -s {{ edge.ip }} -p tcp -m multiport --dports 80,6443 -j ACCEPT
+
+# Site -> shared services on the WAN segment
+iptables -A FORWARD -i "$LAN_IF" -o "$WAN_IF" -d {{ dns.ip }} -p udp --dport 53 -j ACCEPT
+iptables -A FORWARD -i "$LAN_IF" -o "$WAN_IF" -d {{ dns.ip }} -p tcp --dport 53 -j ACCEPT
+iptables -A FORWARD -i "$LAN_IF" -o "$WAN_IF" -d {{ registry.ip }} -p tcp --dport 5000 -j ACCEPT
+iptables -A FORWARD -i "$LAN_IF" -o "$WAN_IF" -d {{ edge.ip }} -p tcp -m multiport --dports 6443,8405 -j ACCEPT
+
+# Site -> internet (image pulls) but never into private ranges (home LAN, VMware NAT)
+iptables -A FORWARD -i "$LAN_IF" -o "$WAN_IF" -d 10.0.0.0/8 -j DROP
+iptables -A FORWARD -i "$LAN_IF" -o "$WAN_IF" -d 172.16.0.0/12 -j DROP
+iptables -A FORWARD -i "$LAN_IF" -o "$WAN_IF" -d 192.168.0.0/16 -j DROP
+iptables -A FORWARD -i "$LAN_IF" -o "$WAN_IF" -j ACCEPT
+iptables -t nat -A POSTROUTING -s {{ site.lan_subnet }} -o "$WAN_IF" ! -d {{ wan.subnet }} -j MASQUERADE
+
+log "ready: $(wg show wg0 peers | wc -l) WireGuard peers, firewall loaded"
+
+# Stay in the foreground; exit cleanly when Docker stops the container.
+trap 'log "stopping"; ip link del wg0 2>/dev/null; exit 0' TERM INT
+while :; do sleep 3600 & wait $!; done

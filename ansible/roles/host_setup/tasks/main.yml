@@ -57,6 +57,13 @@
   loop:
     - { key: fs.inotify.max_user_instances, value: "1024" }
     - { key: fs.inotify.max_user_watches, value: "524288" }
+    # br_netfilter (needed by Kubernetes inside the node containers) defaults this to 1,
+    # which makes the HOST firewall inspect frames that never leave a single Docker
+    # bridge. Docker's anti-spoofing rules then drop every packet the site routers
+    # forward. The setting is per network namespace, so 0 here only affects the
+    # host; every K3s node keeps its own value of 1.
+    - { key: net.bridge.bridge-nf-call-iptables, value: "0" }
+    - { key: net.bridge.bridge-nf-call-ip6tables, value: "0" }
 
 - name: Check installed kubectl version
   ansible.builtin.command: /usr/local/bin/kubectl version --client -o json

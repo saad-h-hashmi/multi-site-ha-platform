@@ -1,0 +1,9 @@
+---
+# Phase 3: create the simulated three-site network (no sudo needed).
+#   make network
+- name: Deploy the multi-site network
+  hosts: lab-host
+  gather_facts: false
+  roles:
+    - secrets
+    - network

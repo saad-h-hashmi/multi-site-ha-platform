@@ -26,6 +26,9 @@ done
 inst=$(sysctl -n fs.inotify.max_user_instances)
 [ "$inst" -ge 512 ] && ok "inotify instances = $inst" || bad "inotify instances = $inst (need >= 512)"
 
+bnf=$(cat /proc/sys/net/bridge/bridge-nf-call-iptables 2>/dev/null || echo 0)
+[ "$bnf" = 0 ] && ok "host bridge-nf-call-iptables = 0" || bad "host bridge-nf-call-iptables = $bnf (must be 0, run: make bootstrap)"
+
 avail_mb=$(awk '/MemAvailable/{print int($2/1024)}' /proc/meminfo)
 [ "$avail_mb" -ge 4500 ] && ok "available RAM ${avail_mb} MB" || warn "available RAM ${avail_mb} MB (lab wants ~4.5 GB free)"
 
