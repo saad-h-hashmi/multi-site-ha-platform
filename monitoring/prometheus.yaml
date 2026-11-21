@@ -52,6 +52,10 @@ data:
         relabel_configs:
           - { source_labels: [__meta_kubernetes_node_label_topology_kubernetes_io_zone], target_label: site }
           - { source_labels: [__meta_kubernetes_node_name], target_label: node }
+        metric_relabel_configs:   # kubelet exposes thousands of histogram series; keep a few
+          - source_labels: [__name__]
+            regex: kubelet_(running_pods|running_containers|node_name)|up
+            action: keep
       # Container CPU / memory (cAdvisor) per pod
       - job_name: cadvisor
         scheme: https
@@ -79,6 +83,10 @@ data:
             replacement: "$1:2381"
           - { source_labels: [__meta_kubernetes_node_label_topology_kubernetes_io_zone], target_label: site }
           - { source_labels: [__meta_kubernetes_node_name], target_label: node }
+        metric_relabel_configs:   # leader/quorum/health series only (drop large histograms)
+          - source_labels: [__name__]
+            regex: etcd_server_(has_leader|is_leader|leader_changes_seen_total|proposals_(committed|applied|failed|pending)_total?|health_(success|failures))|etcd_mvcc_db_total_size_in_bytes|etcd_network_peer_(sent|received)_bytes_total
+            action: keep
       # Deployment / replica / node state
       - job_name: kube-state-metrics
         static_configs: [{ targets: ["kube-state-metrics.monitoring.svc:8080"] }]
@@ -100,6 +108,10 @@ data:
       # Edge load balancer (HAProxy built-in exporter), outside the cluster on the WAN
       - job_name: edge-haproxy
         static_configs: [{ targets: ["172.30.0.100:8405"], labels: { site: wan } }]
+        metric_relabel_configs:
+          - source_labels: [__name__]
+            regex: haproxy_(server_(status|http_responses_total|check_failures_total|current_sessions)|backend_(active_servers|http_responses_total|status)|frontend_http_requests_total)
+            action: keep
   alerts.yml: |
     groups:
       - name: platform
@@ -179,11 +191,13 @@ spec:
             - --storage.tsdb.retention.size=300MB
             - --web.enable-lifecycle
           ports: [{ name: http, containerPort: 9090 }]
-          readinessProbe: { httpGet: { path: /-/ready, port: http }, periodSeconds: 10 }
-          livenessProbe: { httpGet: { path: /-/healthy, port: http }, periodSeconds: 20, failureThreshold: 6 }
+          # generous timeouts: on 2 shared vCPUs a WAL replay after restart can take minutes
+          startupProbe: { httpGet: { path: /-/ready, port: http }, periodSeconds: 10, timeoutSeconds: 5, failureThreshold: 60 }
+          readinessProbe: { httpGet: { path: /-/ready, port: http }, periodSeconds: 10, timeoutSeconds: 5 }
+          livenessProbe: { httpGet: { path: /-/healthy, port: http }, periodSeconds: 20, timeoutSeconds: 5, failureThreshold: 6 }
           resources:
-            requests: { cpu: 50m, memory: 128Mi }
-            limits: { memory: 384Mi }
+            requests: { cpu: 50m, memory: 192Mi }
+            limits: { memory: 512Mi }
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

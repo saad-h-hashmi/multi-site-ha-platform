@@ -24,8 +24,8 @@ check K8S-06 "nodes are labelled into 3 sites (topology zones)" \
   sh -c "kubectl get nodes -L topology.kubernetes.io/zone --no-headers | awk '{print \$NF}' | sort | uniq -c | tee /dev/stderr | wc -l | grep -qx 3"
 check K8S-07 "cluster DNS (CoreDNS) runs 3 replicas" \
   sh -c "kubectl -n kube-system get deploy coredns -o jsonpath='{.status.availableReplicas}' | tee /dev/stderr | grep -qx 3"
-check K8S-08 "ingress (Traefik) runs 2 replicas in different sites" \
-  sh -c "kubectl -n kube-system get pods -l app.kubernetes.io/name=traefik -o jsonpath='{range .items[*]}{.spec.nodeName}{\"\n\"}{end}' | tee /dev/stderr | cut -d- -f1-2 | sort -u | wc -l | grep -qx 2"
+check K8S-08 "ingress (Traefik) runs 3 replicas, one per site" \
+  sh -c "kubectl -n kube-system get pods -l app.kubernetes.io/name=traefik --field-selector=status.phase=Running -o jsonpath='{range .items[*]}{.spec.nodeName}{\"\n\"}{end}' | tee /dev/stderr | cut -d- -f1-2 | sort -u | wc -l | grep -qx 3"
 
 echo "== Application"
 check APP-01 "SitePulse deployment has 3/3 replicas available" \
@@ -67,12 +67,14 @@ check SEC-07 "no secrets are tracked by git" \
 echo "== Monitoring and edge"
 check MON-01 "Prometheus is ready (via edge)" curl -fsS -m5 http://127.0.0.1:9090/-/ready
 check MON-02 "every Prometheus target is up" \
-  sh -c "curl -s http://127.0.0.1:9090/api/v1/targets | jq -r '.data.activeTargets[] | \"\(.health) \(.labels.job) \(.labels.node // .scrapeUrl)\"' | tee /dev/stderr | grep -vq '^up' && exit 1 || exit 0"
+  sh -c "curl -fsS http://127.0.0.1:9090/api/v1/targets > /tmp/msha_targets.json || exit 1; jq -r '.data.activeTargets[] | \"\(.health) \(.labels.job) \(.labels.node // .scrapeUrl)\"' /tmp/msha_targets.json | tee /dev/stderr > /tmp/msha_targets.txt; n=\$(wc -l < /tmp/msha_targets.txt); up=\$(grep -c '^up ' /tmp/msha_targets.txt); echo \"\$up/\$n targets up\"; [ \"\$n\" -ge 18 ] && [ \"\$up\" = \"\$n\" ]"
 check MON-03 "Prometheus sees 3 etcd members and 6 Ready nodes" \
   sh -c "e=\$(curl -s http://127.0.0.1:9090/api/v1/query --data-urlencode 'query=sum(up{job=\"etcd\"})' | jq -r '.data.result[0].value[1]'); n=\$(curl -s http://127.0.0.1:9090/api/v1/query --data-urlencode 'query=sum(kube_node_status_condition{condition=\"Ready\",status=\"true\"})' | jq -r '.data.result[0].value[1]'); echo etcd=\$e nodes=\$n; [ \"\$e\" = 3 ] && [ \"\$n\" = 6 ]"
 check EDGE-01 "HAProxy stats page refuses access without a password" \
   sh -c "curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8404/ | grep -qx 401"
-check EDGE-02 "edge sees 3/3 API servers and 6/6 ingress nodes UP" \
-  sh -c "curl -s -u admin:$STATS_PW 'http://127.0.0.1:8404/;csv' | awk -F, '\$1==\"k8s_api_servers\"||\$1==\"ingress_app\"{print \$1,\$2,\$18}' | grep -v BACKEND | tee /dev/stderr | awk '\$3==\"UP\"{c[\$1]++} END{exit !(c[\"k8s_api_servers\"]==3 && c[\"ingress_app\"]==6)}'"
+# With externalTrafficPolicy: Local only nodes that run a Traefik pod serve ingress,
+# so exactly those nodes must be UP at the edge (3 of 6).
+check EDGE-02 "edge sees 3/3 API servers UP and exactly the 3 Traefik nodes UP for ingress" \
+  sh -c "t=\$(kubectl -n kube-system get pods -l app.kubernetes.io/name=traefik --field-selector=status.phase=Running -o jsonpath='{range .items[*]}{.spec.nodeName}{\"\n\"}{end}' | sort | xargs); u=\$(curl -s -u admin:$STATS_PW 'http://127.0.0.1:8404/;csv' | awk -F, '\$1==\"ingress_app\" && \$2!=\"BACKEND\" && \$18==\"UP\"{print \$2}' | sort | xargs); a=\$(curl -s -u admin:$STATS_PW 'http://127.0.0.1:8404/;csv' | awk -F, '\$1==\"k8s_api_servers\" && \$2!=\"BACKEND\" && \$18==\"UP\"' | wc -l); echo \"traefik nodes: \$t\"; echo \"ingress UP:    \$u\"; echo \"API UP: \$a/3\"; [ \"\$a\" = 3 ] && [ -n \"\$t\" ] && [ \"\$t\" = \"\$u\" ] && [ \$(echo \$t | wc -w) = 3 ]"
 
 finish

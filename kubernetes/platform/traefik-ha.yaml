@@ -1,6 +1,18 @@
 # K3s installs Traefik with a single replica. That would make ingress a single
-# point of failure, so run two replicas in different sites and protect them with
-# a PodDisruptionBudget. K3s's Helm controller merges these values into its chart.
+# point of failure, so run one replica per site (3), protected by a PodDisruptionBudget.
+#
+# Traefik listens directly on port 80 of the node it runs on (hostPort), and its
+# Service is ClusterIP, so K3s ServiceLB is not used for it. The edge load balancer
+# therefore connects straight to a Traefik process:
+#   * nodes without Traefik refuse the connection -> marked DOWN at the edge;
+#   * a dead node times out after 500 ms -> the edge retries another node.
+# Why: with ServiceLB, every node forwards port 80 through kube-proxy to ANY Traefik
+# pod, including one on a node that has just died, and the request hangs. Measured in
+# the second failover run (91 % availability during a worker failure). Setting
+# externalTrafficPolicy: Local does not help, because ServiceLB forwards from a pod and
+# kube-proxy treats that as internal traffic. That was tested, and the result was
+# that all 6 nodes kept serving.
+# K3s's Helm controller merges these values into its bundled chart.
 apiVersion: helm.cattle.io/v1
 kind: HelmChartConfig
 metadata:
@@ -9,10 +21,16 @@ metadata:
 spec:
   valuesContent: |-
     deployment:
-      replicas: 2
+      replicas: 3
     podDisruptionBudget:
       enabled: true
-      minAvailable: 1
+      minAvailable: 2
+    service:
+      spec:
+        type: ClusterIP          # chart 41.x: the type lives under service.spec
+    ports:
+      web:
+        hostPort: 80
     topologySpreadConstraints:
       - maxSkew: 1
         topologyKey: topology.kubernetes.io/zone
@@ -21,14 +39,15 @@ spec:
         labelSelector:
           matchLabels:
             app.kubernetes.io/name: traefik
+        matchLabelKeys: [pod-template-hash]   # count only the current revision during rollouts
     additionalArguments:
-      # Give up on an unreachable pod (e.g. on a failed node) after 1 s instead of 30 s,
-      # so the retry middleware can send the request to a healthy replica.
-      - --serversTransport.forwardingTimeouts.dialTimeout=1s
+      # Give up on an unreachable pod (e.g. on a failed node) after 0.5 s instead of
+      # 30 s, so the retry middleware can send the request to a healthy replica.
+      - --serversTransport.forwardingTimeouts.dialTimeout=500ms
     resources:
       requests: { cpu: 25m, memory: 48Mi }
       limits: { memory: 128Mi }
     tolerations:
-      # leave a failed node quickly so the surviving replica is not alone for long
+      # leave a failed node quickly so the surviving replicas are not alone for long
       - { key: node.kubernetes.io/unreachable, operator: Exists, effect: NoExecute, tolerationSeconds: 30 }
       - { key: node.kubernetes.io/not-ready, operator: Exists, effect: NoExecute, tolerationSeconds: 30 }

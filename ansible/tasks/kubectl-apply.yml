@@ -1,0 +1,17 @@
+---
+# Idempotent "kubectl apply -k <dir>": apply only when `kubectl diff` reports a
+# difference, so Ansible's "changed" is truthful. (Client-side apply reports some
+# objects, such as StatefulSets and PDBs, as "configured" even when nothing differs.)
+# Vars: kustomize_dir (required). Registers: kapply (stdout of apply, or empty).
+- name: "Diff {{ kustomize_dir | basename }} manifests against the cluster"
+  ansible.builtin.command: kubectl diff -k {{ kustomize_dir }}
+  environment: { KUBECONFIG: "{{ build_dir }}/kubeconfig" }
+  register: kdiff
+  changed_when: false
+  failed_when: kdiff.rc > 1          # 0 = no differences, 1 = differences, >1 = error
+
+- name: "Apply {{ kustomize_dir | basename }} manifests"
+  ansible.builtin.command: kubectl apply -k {{ kustomize_dir }}
+  environment: { KUBECONFIG: "{{ build_dir }}/kubeconfig" }
+  register: kapply
+  when: kdiff.rc == 1

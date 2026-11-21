@@ -1,10 +1,10 @@
 ---
-# Platform layer (namespaces, Traefik HA) and the SitePulse application.
-- name: Apply platform manifests (namespaces, Traefik HA)
-  ansible.builtin.command: kubectl apply -k {{ project_root }}/kubernetes/platform
-  environment: { KUBECONFIG: "{{ build_dir }}/kubeconfig" }
-  register: platform_apply
-  changed_when: "'configured' in platform_apply.stdout or 'created' in platform_apply.stdout"
+# Platform layer (namespaces, Traefik HA, CoreDNS replicas) and the SitePulse application.
+# Every task reports "changed" only when something really changed (verified: a second
+# `make app` reports changed=0 and restarts nothing).
+- name: Platform manifests (namespaces, Traefik HA)
+  ansible.builtin.include_tasks: "{{ project_root }}/ansible/tasks/kubectl-apply.yml"
+  vars: { kustomize_dir: "{{ project_root }}/kubernetes/platform" }
 
 - name: Run CoreDNS with 3 replicas (K3s default is 1, a single point of failure for DNS)
   ansible.builtin.shell: |
@@ -20,42 +20,74 @@
     fail_msg: "Set newTag in kubernetes/sitepulse/kustomization.yaml to {{ app.version }}"
     quiet: true
 
-- name: Build the SitePulse image
+# ---- image: rebuild, push and roll ONLY when the application source changed.
+# BuildKit image IDs differ between identical builds (build metadata), so the
+# decision uses a hash of the source files, stored as an image label.
+- name: Hash the application source
+  ansible.builtin.shell: |
+    set -o pipefail
+    cd {{ project_root }}/app/sitepulse && { find . -type f -print0 | sort -z | xargs -0 sha256sum; echo "{{ app.version }}"; } | sha256sum | cut -c1-16
+  args: { executable: /bin/bash }
+  register: app_src_hash
+  changed_when: false
+
+- name: Look up the current SitePulse image
+  community.docker.docker_image_info:
+    name: "{{ app.image }}:{{ app.version }}"
+  register: app_image_before
+
+- name: Build the SitePulse image when its source changed
   community.docker.docker_image_build:
     name: "{{ app.image }}"
     tag: "{{ app.version }}"
     path: "{{ project_root }}/app/sitepulse"
     args: { APP_VERSION: "{{ app.version }}" }
-    rebuild: always            # cheap; the build cache makes unchanged builds instant
+    labels: { msha.source-hash: "{{ app_src_hash.stdout }}" }
+    rebuild: always
   register: app_build
+  when: >-
+    (app_image_before.images | length == 0) or
+    ((app_image_before.images[0].Config.Labels | default({}, true)).get('msha.source-hash') != app_src_hash.stdout)
+
+- name: Check whether the lab registry already has this version
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ registry.host_port }}/v2/{{ app.name }}/manifests/{{ app.version }}"
+    method: HEAD
+    headers: { Accept: "application/vnd.oci.image.manifest.v1+json,application/vnd.docker.distribution.manifest.v2+json,application/vnd.oci.image.index.v1+json" }
+    status_code: [200, 404]
+  register: registry_has
 
 - name: Push the SitePulse image to the lab registry
   community.docker.docker_image_push:
     name: "{{ app.image }}"
     tag: "{{ app.version }}"
   register: app_push
+  when: (app_build is not skipped) or registry_has.status == 404
 
+# ---- application
 - name: Create or update the Redis password Secret (value from .secrets/)
   ansible.builtin.shell: |
     set -o pipefail
+    want=$(base64 -w0 < {{ secrets_dir }}/redis-password)
+    have=$(kubectl -n sitepulse get secret redis-auth -o jsonpath='{.data.password}' 2>/dev/null || true)
+    [ "$want" = "$have" ] && echo unchanged && exit 0
     kubectl -n sitepulse create secret generic redis-auth \
-      --from-file=password={{ secrets_dir }}/redis-password \
-      --dry-run=client -o yaml | kubectl apply -f -
+      --from-file=password={{ secrets_dir }}/redis-password --dry-run=client -o yaml | kubectl apply -f -
   args: { executable: /bin/bash }
   environment: { KUBECONFIG: "{{ build_dir }}/kubeconfig" }
   register: redis_secret
-  changed_when: "'configured' in redis_secret.stdout or 'created' in redis_secret.stdout"
+  changed_when: "'unchanged' not in redis_secret.stdout"
+  no_log: true
 
-- name: Apply the SitePulse application
-  ansible.builtin.command: kubectl apply -k {{ project_root }}/kubernetes/sitepulse
-  environment: { KUBECONFIG: "{{ build_dir }}/kubeconfig" }
-  register: app_apply
-  changed_when: "'configured' in app_apply.stdout or 'created' in app_apply.stdout"
+- name: SitePulse application manifests
+  ansible.builtin.include_tasks: "{{ project_root }}/ansible/tasks/kubectl-apply.yml"
+  vars: { kustomize_dir: "{{ project_root }}/kubernetes/sitepulse" }
 
-- name: Restart SitePulse pods when a new image was pushed with the same tag
+# Same tag, new image content (and no manifest change that would roll it anyway)
+- name: Roll SitePulse when the image content changed but the tag did not
   ansible.builtin.command: kubectl -n sitepulse rollout restart deployment/sitepulse
   environment: { KUBECONFIG: "{{ build_dir }}/kubeconfig" }
-  when: app_push is changed and 'created' not in app_apply.stdout
+  when: (app_build is not skipped) and kdiff.rc == 0
 
 - name: Wait for Redis and SitePulse to become ready
   ansible.builtin.command: kubectl -n sitepulse rollout status {{ item }} --timeout=300s
@@ -63,7 +95,7 @@
   loop: [statefulset/redis, deployment/sitepulse]
   changed_when: false
 
-- name: Wait for Traefik to run two replicas
+- name: Wait for Traefik to run three replicas
   ansible.builtin.command: kubectl -n kube-system rollout status deployment/traefik --timeout=300s
   environment: { KUBECONFIG: "{{ build_dir }}/kubeconfig" }
   register: traefik_rollout

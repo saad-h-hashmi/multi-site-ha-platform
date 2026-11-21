@@ -61,7 +61,7 @@ spec:
             - --resources=nodes,pods,services,persistentvolumeclaims,namespaces,deployments,statefulsets,daemonsets,replicasets
           ports: [{ name: http, containerPort: 8080 }]
           readinessProbe: { httpGet: { path: /readyz, port: 8081 }, periodSeconds: 10 }
-          livenessProbe: { httpGet: { path: /livez, port: 8081 }, periodSeconds: 20 }
+          livenessProbe: { httpGet: { path: /livez, port: http }, periodSeconds: 20 }   # /livez is on the metrics port
           resources:
             requests: { cpu: 10m, memory: 32Mi }
             limits: { memory: 96Mi }

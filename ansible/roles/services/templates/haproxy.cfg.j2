@@ -14,10 +14,10 @@ global
 
 defaults
     log global
-    timeout connect 1s          # a dead node is detected quickly...
+    timeout connect 500ms       # a dead node is detected quickly...
     timeout client  60s
     timeout server  60s
-    retries 2                   # ...and the request is retried
+    retries 3                   # ...and the request is retried
     option redispatch 1         # on a DIFFERENT backend node
     timeout tunnel  1h          # long-lived kubectl watch/exec streams
     default-server inter 2s fall 2 rise 2 on-marked-down shutdown-sessions

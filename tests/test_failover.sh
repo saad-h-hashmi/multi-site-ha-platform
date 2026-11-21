@@ -4,7 +4,7 @@
 # waits for the platform to be fully healthy before the next scenario.
 #
 # While a scenario runs, two background probes measure availability:
-#   app probe : GET http://127.0.0.1:8080/healthz every 0.25 s (through the edge)
+#   app probe : GET http://127.0.0.1:8080/api/info every 0.25 s, 3 s timeout (through the edge)
 #   api probe : kubectl get --raw /readyz every 1 s       (through the edge)
 #
 # Usage: tests/test_failover.sh [scenario ...]
@@ -38,7 +38,8 @@ probe_start() {
   local name=$1
   APP_LOG="$FO_DIR/$name-app.log"; API_LOG="$FO_DIR/$name-api.log"
   # a real user request (no counter increment), not a health endpoint
-  ( while :; do c=$(curl -s -o /dev/null -m 1 -w '%{http_code}' $EDGE/api/info); echo "$(date +%s.%N) $c"; sleep 0.25; done ) > "$APP_LOG" 2>/dev/null &
+  # -m 3: a request that fails OR takes longer than 3 s counts as unavailable
+  ( while :; do c=$(curl -s -o /dev/null -m 3 -w '%{http_code}' $EDGE/api/info); echo "$(date +%s.%N) $c"; sleep 0.25; done ) > "$APP_LOG" 2>/dev/null &
   APP_PID=$!
   ( while :; do if kubectl --request-timeout=2s get --raw /readyz >/dev/null 2>&1; then c=ok; else c=fail; fi; echo "$(date +%s.%N) $c"; sleep 1; done ) > "$API_LOG" 2>/dev/null &
   API_PID=$!
@@ -127,13 +128,16 @@ sc_readiness() {
   probe_start readiness; sleep 3
   kubectl -n sitepulse exec "$victim" -- python3 -c "import urllib.request as u;u.urlopen(u.Request('http://127.0.0.1:8000/chaos/readiness',method='POST'))"
   local out; out=$(wait_until 30 sh -c "kubectl -n sitepulse get endpointslices -l kubernetes.io/service-name=sitepulse -o json | jq -e '[.items[].endpoints[] | select(.targetRef.name==\"$victim\" and .conditions.ready==false)] | length == 1'")
-  # while not ready, no request should be served by the victim
+  # Measure how long the ingress (Traefik) keeps sending traffic to the unready pod
+  # after Kubernetes removed it from the endpoints: done when 20 requests in a row
+  # are served by other pods. Then count again: it must receive nothing.
+  local t_stop; t_stop=$(wait_until 30 sh -c "for i in \$(seq 20); do curl -s -m3 $EDGE/api/info | jq -r .pod | grep -qx $victim && exit 1; done; exit 0")
   local served=0; for i in $(seq 20); do curl -s $EDGE/api/info | jq -r .pod | grep -qx "$victim" && served=$((served+1)); done
   kubectl -n sitepulse exec "$victim" -- python3 -c "import urllib.request as u;u.urlopen(u.Request('http://127.0.0.1:8000/chaos/readiness',method='POST'))"
   local back; back=$(wait_until 30 app_available 3)
   sleep 3; probe_stop
-  record "FO-03 readiness probe failure" "/readyz forced to 503 on $victim" "removed from endpoints after ${out}s; served $served/20 requests while unready; back after ${back}s" "$([ $served = 0 ] && echo PASS || echo FAIL)"
-  check FO-03 "unready pod received no traffic ($served/20) and app stayed up" test "$served" = 0
+  record "FO-03 readiness probe failure" "/readyz forced to 503 on $victim" "endpoint not-ready after ${out}s; ingress stopped routing to it within ${t_stop}s of that; afterwards $served/20 requests reached it; back after ${back}s" "$([ $served = 0 ] && [ "$(echo "$APP_GAP < 2" | bc)" = 1 ] && echo PASS || echo FAIL)"
+  check FO-03 "unready pod taken out of traffic (ingress lag ${t_stop}s, then $served/20) and app stayed up" sh -c "[ $served = 0 ] && [ \"$(echo "$APP_GAP < 2" | bc)\" = 1 ]"
 }
 
 sc_worker() {

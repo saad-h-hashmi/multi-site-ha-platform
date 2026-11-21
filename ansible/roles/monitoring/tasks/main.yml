@@ -1,21 +1,18 @@
 ---
 # Lightweight monitoring: Prometheus + kube-state-metrics.
 # (Grafana was evaluated and removed for disk reasons; see AD-11.)
-- name: Ensure the monitoring namespace exists
-  ansible.builtin.command: kubectl apply -k {{ project_root }}/kubernetes/platform
-  environment: { KUBECONFIG: "{{ build_dir }}/kubeconfig" }
-  changed_when: false
+- name: Platform manifests (the monitoring namespace)
+  ansible.builtin.include_tasks: "{{ project_root }}/ansible/tasks/kubectl-apply.yml"
+  vars: { kustomize_dir: "{{ project_root }}/kubernetes/platform" }
 
-- name: Apply the monitoring stack
-  ansible.builtin.command: kubectl apply -k {{ project_root }}/monitoring
-  environment: { KUBECONFIG: "{{ build_dir }}/kubeconfig" }
-  register: mon_apply
-  changed_when: "'configured' in mon_apply.stdout or 'created' in mon_apply.stdout"
+- name: Monitoring manifests
+  ansible.builtin.include_tasks: "{{ project_root }}/ansible/tasks/kubectl-apply.yml"
+  vars: { kustomize_dir: "{{ project_root }}/monitoring" }
 
-- name: Reload Prometheus when its configuration changed
+- name: Restart Prometheus when its configuration changed (ConfigMaps do not reload by themselves)
   ansible.builtin.command: kubectl -n monitoring rollout restart deployment/prometheus
   environment: { KUBECONFIG: "{{ build_dir }}/kubeconfig" }
-  when: "'configmap/prometheus-config configured' in mon_apply.stdout"
+  when: kapply is not skipped and 'configmap/prometheus-config configured' in kapply.stdout
 
 - name: Wait for the monitoring stack
   ansible.builtin.command: kubectl -n monitoring rollout status deployment/{{ item }} --timeout=600s
