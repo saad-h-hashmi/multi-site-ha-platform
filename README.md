@@ -8,14 +8,14 @@ The original assignment brief and project specification are preserved in [PROJEC
 
 ---
 
-## Project team
+## Project team and contributors
 
 Group project, University of Lahore, Department of Technology. Instructor: Ms. Sana. Submitted 21 November 2026.
 
-| Name | Registration number |
-|---|---|
-| Saad Hussain Hashmi | 70154663 |
-| Sadia Alla Dita | 70154570 |
+| Name | Registration number | Contribution |
+|---|---|---|
+| Saad Hussain Hashmi ([@saad-h-hashmi](https://github.com/saad-h-hashmi)) | 70154663 | **Step 1 (Part 1):** multi-site network, Kubernetes platform, automation, application, monitoring, testing and documentation (git tag `step-1`) |
+| Sadia Alla Dita | 70154570 | **Step 2 (Part 2)**: upcoming |
 
 ## What is built
 
