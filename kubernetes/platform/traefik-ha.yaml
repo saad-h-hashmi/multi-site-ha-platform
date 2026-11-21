@@ -21,6 +21,10 @@ spec:
         labelSelector:
           matchLabels:
             app.kubernetes.io/name: traefik
+    additionalArguments:
+      # Give up on an unreachable pod (e.g. on a failed node) after 1 s instead of 30 s,
+      # so the retry middleware can send the request to a healthy replica.
+      - --serversTransport.forwardingTimeouts.dialTimeout=1s
     resources:
       requests: { cpu: 25m, memory: 48Mi }
       limits: { memory: 128Mi }

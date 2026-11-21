@@ -103,7 +103,7 @@ app:
   name: sitepulse
   image: "localhost:{{ registry.host_port }}/sitepulse"
   in_cluster_image: "{{ registry.ip }}:5000/sitepulse"
-  version: "1.0.0"
+  version: "1.2.0"   # must match newTag in kubernetes/sitepulse/kustomization.yaml
   hostname: sitepulse.lab.internal
 
 # In-cluster images (Redis, Prometheus, kube-state-metrics) are pinned in

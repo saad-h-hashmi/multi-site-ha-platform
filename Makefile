@@ -49,3 +49,55 @@ app: ## Build, push and deploy the SitePulse application
 .PHONY: monitoring
 monitoring: ## Deploy Prometheus and kube-state-metrics
 	$(PLAYBOOK) $(PB)/50-monitoring.yml
+
+# ---------------------------------------------------------------- operations
+.PHONY: health
+health: ## Quick health summary of network, Kubernetes, etcd and the app
+	@$(ROOT)/scripts/health.sh
+
+.PHONY: net-status
+net-status: ## Show routes, WireGuard tunnels and firewall counters for each site
+	@$(ROOT)/scripts/net-status.sh
+
+.PHONY: kubeconfig
+kubeconfig: ## Print the export command for kubectl access
+	@echo "export KUBECONFIG=$(ROOT)/build/kubeconfig"
+
+.PHONY: backup
+backup: ## Back up etcd, application data and secrets into backups/<timestamp>/
+	@$(ROOT)/scripts/backup.sh
+
+.PHONY: restore-data
+restore-data: ## Restore application data from the newest backup (online, safe)
+	@$(ROOT)/scripts/restore.sh data
+
+.PHONY: restore-etcd
+restore-etcd: ## Roll the whole cluster back to the newest etcd snapshot (asks first)
+	@$(ROOT)/scripts/restore.sh etcd
+
+# ---------------------------------------------------------------- testing
+.PHONY: test
+test: ## Run the non-destructive tests (network + platform)
+	@$(ROOT)/tests/test_network.sh; n=$$?; $(ROOT)/tests/test_platform.sh; p=$$?; exit $$((n|p))
+
+.PHONY: test-failover
+test-failover: ## Run the HA failure tests (breaks things on purpose, then restores them)
+	@$(ROOT)/tests/test_failover.sh
+
+.PHONY: test-rebuild
+test-rebuild: ## Destroy and rebuild everything from code, then run all tests (~15 min)
+	@$(ROOT)/tests/test_rebuild.sh
+
+# ---------------------------------------------------------------- lifecycle
+.PHONY: rebuild
+rebuild: ## Destroy the lab and deploy it again from code (keeps .secrets/)
+	ASSUME_YES=1 $(ROOT)/scripts/destroy.sh
+	$(MAKE) deploy
+
+.PHONY: clean
+clean: ## Remove all lab containers, networks and volumes (asks first; keeps images and secrets)
+	@$(ROOT)/scripts/destroy.sh
+
+.PHONY: clean-all
+clean-all: ## clean + remove generated secrets and downloaded images
+	@$(ROOT)/scripts/destroy.sh --secrets --images

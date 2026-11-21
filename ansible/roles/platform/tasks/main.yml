@@ -6,6 +6,20 @@
   register: platform_apply
   changed_when: "'configured' in platform_apply.stdout or 'created' in platform_apply.stdout"
 
+- name: Run CoreDNS with 3 replicas (K3s default is 1, a single point of failure for DNS)
+  ansible.builtin.shell: |
+    [ "$(kubectl -n kube-system get deploy coredns -o jsonpath='{.spec.replicas}')" = 3 ] && echo unchanged && exit 0
+    kubectl -n kube-system scale deploy coredns --replicas=3
+  environment: { KUBECONFIG: "{{ build_dir }}/kubeconfig" }
+  register: coredns_scale
+  changed_when: "'unchanged' not in coredns_scale.stdout"
+
+- name: Check the image tag in kustomization.yaml matches app.version
+  ansible.builtin.assert:
+    that: "(lookup('file', project_root ~ '/kubernetes/sitepulse/kustomization.yaml') | from_yaml).images | selectattr('name', 'equalto', 'SITEPULSE_IMAGE') | map(attribute='newTag') | first == app.version"
+    fail_msg: "Set newTag in kubernetes/sitepulse/kustomization.yaml to {{ app.version }}"
+    quiet: true
+
 - name: Build the SitePulse image
   community.docker.docker_image_build:
     name: "{{ app.image }}"

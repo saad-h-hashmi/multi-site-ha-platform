@@ -1,7 +1,7 @@
 # =============================================================================
 # Edge load balancer (HAProxy). Rendered by Ansible; do not edit by hand.
 #  :6443  Kubernetes API   -> 3 K3s servers (one per site), TCP health checks
-#  :8080  SitePulse app    -> Traefik ingress on all 6 nodes, HTTP health checks
+#  :8080  SitePulse app    -> Traefik ingress on all 6 nodes, HTTP readiness checks
 #  :9090  Prometheus       -> Traefik ingress (Host: prometheus.{{ dns.zone }})
 #  :8404  statistics page (password protected)
 #  :8405  Prometheus metrics for HAProxy itself (lab-internal, not published)
@@ -14,9 +14,11 @@ global
 
 defaults
     log global
-    timeout connect 3s
+    timeout connect 1s          # a dead node is detected quickly...
     timeout client  60s
     timeout server  60s
+    retries 2                   # ...and the request is retried
+    option redispatch 1         # on a DIFFERENT backend node
     timeout tunnel  1h          # long-lived kubectl watch/exec streams
     default-server inter 2s fall 2 rise 2 on-marked-down shutdown-sessions
 
@@ -43,6 +45,7 @@ backend {{ name }}
     option httpchk
     http-check send meth GET uri {{ check_path }} ver HTTP/1.1 hdr Host {{ host }}
     http-check expect status 200
+    retry-on conn-failure empty-response junk-response 502 503 504
     http-request set-header Host {{ host }}
     http-response set-header X-Edge-Backend %s
 {% for s in sites %}
@@ -57,7 +60,7 @@ frontend app_http
     option httplog
     option forwardfor
     default_backend ingress_app
-{{ ingress_backend('ingress_app', app.hostname, '/healthz') }}
+{{ ingress_backend('ingress_app', app.hostname, '/readyz') }}
 
 frontend prometheus_http
     bind :9090

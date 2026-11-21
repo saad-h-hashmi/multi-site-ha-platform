@@ -9,10 +9,11 @@ resources:
   - deployment.yaml
   - service-ingress.yaml
   - networkpolicy.yaml
+  - traefik-retry.yaml
 images:
   - name: SITEPULSE_IMAGE
     newName: 172.30.0.50:5000/sitepulse
-    newTag: "1.0.0"
+    newTag: "1.2.0"   # keep in sync with app.version in group_vars/all.yml
   - name: REDIS_IMAGE
     newName: redis
     newTag: 7.4-alpine

@@ -61,7 +61,7 @@ def redis_cmd(*args, timeout=0.5):
             out.append(f"${len(b)}\r\n".encode() + b + b"\r\n")
         return b"".join(out)
 
-    with socket.create_connection((REDIS_HOST, REDIS_PORT), timeout=timeout) as s:
+    with socket.create_connection((redis_address(), REDIS_PORT), timeout=timeout) as s:
         f = s.makefile("rb")
         if REDIS_PASSWORD:
             s.sendall(encode(["AUTH", REDIS_PASSWORD]))
@@ -90,12 +90,42 @@ def _read_reply(f):
     raise RedisError(f"unexpected reply {line!r}")
 
 
-def visits(increment):
+_redis_ip = {"ip": None, "at": 0.0}
+
+
+def redis_address():
+    """Resolve REDIS_HOST at most every 30 s and keep the last good answer, so a DNS
+    outage (e.g. a CoreDNS pod on a failed node) cannot stall every request."""
+    now = time.time()
+    if _redis_ip["ip"] and now - _redis_ip["at"] < 30:
+        return _redis_ip["ip"]
     try:
-        value = redis_cmd("INCR" if increment else "GET", "sitepulse:visits")
-        return {"ok": True, "visits": int(value or 0)}
-    except (OSError, RedisError) as e:
-        return {"ok": False, "visits": None, "error": str(e)}
+        _redis_ip["ip"] = socket.getaddrinfo(REDIS_HOST, REDIS_PORT, type=socket.SOCK_STREAM)[0][4][0]
+        _redis_ip["at"] = now
+    except OSError:
+        if not _redis_ip["ip"]:
+            raise
+    return _redis_ip["ip"]
+
+
+def visits(increment, budget=0.6):
+    """Read or increment the counter, but never make the page wait more than `budget`
+    seconds: the web tier must keep answering even when Redis or DNS is down."""
+    result = {"ok": False, "visits": None, "error": "redis timeout"}
+
+    def work():
+        try:
+            value = redis_cmd("INCR" if increment else "GET", "sitepulse:visits")
+            result.update(ok=True, visits=int(value or 0), error=None)
+        except (OSError, RedisError) as e:
+            result.update(error=str(e))
+
+    t = threading.Thread(target=work, daemon=True)
+    t.start()
+    t.join(budget)
+    if result["error"] is None:
+        del result["error"]
+    return result
 
 
 # --------------------------------------------------------------- Kubernetes API
@@ -147,7 +177,7 @@ def info(increment=False):
         "node": NODE_NAME,
         "site": SITE,
         "uptime_seconds": int(time.time() - STARTED),
-        "health": {"live": state["live"], "ready": state["ready"] and not state["shutting_down"]},
+        "health": {"live": state["live"], "ready": state["live"] and state["ready"] and not state["shutting_down"]},
         "counter": visits(increment),
         "python": sys.version.split()[0],
         "time": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
@@ -235,7 +265,9 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/healthz":
             self._send(200 if state["live"] else 500, {"status": "ok" if state["live"] else "failing", "pod": POD_NAME})
         elif path == "/readyz":
-            ok = state["ready"] and not state["shutting_down"]
+            # A pod that is not live (hung) is never ready either: it leaves the
+            # Service quickly (readiness) before kubelet restarts it (liveness).
+            ok = state["live"] and state["ready"] and not state["shutting_down"]
             self._send(200 if ok else 503, {"status": "ready" if ok else "not-ready", "pod": POD_NAME})
         elif path == "/metrics":
             self._send(200, self._metrics(), "text/plain; version=0.0.4")
@@ -248,7 +280,7 @@ class Handler(BaseHTTPRequestHandler):
             self._send(403, {"error": "chaos endpoints disabled"})
         elif path == "/chaos/liveness":
             state["live"] = False
-            self._send(200, {"pod": POD_NAME, "live": False, "note": "kubelet will restart this container"})
+            self._send(200, {"pod": POD_NAME, "live": False, "note": "readiness fails now; kubelet will restart this container"})
         elif path == "/chaos/readiness":
             state["ready"] = not state["ready"]
             self._send(200, {"pod": POD_NAME, "ready": state["ready"]})
@@ -266,7 +298,7 @@ class Handler(BaseHTTPRequestHandler):
             f"sitepulse_up {1 if state['live'] else 0}",
             "# HELP sitepulse_ready 1 when the instance is ready.",
             "# TYPE sitepulse_ready gauge",
-            f"sitepulse_ready {1 if state['ready'] and not state['shutting_down'] else 0}",
+            f"sitepulse_ready {1 if state['live'] and state['ready'] and not state['shutting_down'] else 0}",
             "# HELP sitepulse_redis_up 1 when Redis is reachable.",
             "# TYPE sitepulse_redis_up gauge",
             f"sitepulse_redis_up {1 if r['ok'] else 0}",

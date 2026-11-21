@@ -1,0 +1,12 @@
+# Retry a failed request on another replica (Traefik middleware). Together with the
+# 1 s dial timeout this hides the window between a node failing and Kubernetes
+# removing its pods from the Service endpoints (~20-40 s).
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: retry
+  namespace: sitepulse
+spec:
+  retry:
+    attempts: 3
+    initialInterval: 100ms

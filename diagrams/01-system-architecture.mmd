@@ -1,0 +1,29 @@
+%% Overall system architecture
+flowchart TB
+  WIN["Windows host (browser, kubectl)"] -->|"VMware NAT 192.168.30.128<br/>:8080 app  :6443 API  :8404 stats"| EDGE
+  subgraph VM["Ubuntu VM: Docker Engine (single physical host)"]
+    subgraph WAN["WAN / transit 172.30.0.0/24"]
+      EDGE["Edge load balancer<br/>HAProxy 172.30.0.100"]
+      DNS["Lab DNS<br/>CoreDNS 172.30.0.53"]
+      REG["Image registry<br/>172.30.0.50:5000"]
+    end
+    subgraph SA["Site A 10.10.10.0/24"]
+      RA["router-a"] --- A1["site-a-server<br/>K3s server + etcd"] & A2["site-a-agent<br/>K3s agent"]
+    end
+    subgraph SB["Site B 10.20.20.0/24"]
+      RB["router-b"] --- B1["site-b-server<br/>K3s server + etcd"] & B2["site-b-agent<br/>K3s agent"]
+    end
+    subgraph SC["Site C 10.30.30.0/24"]
+      RC["router-c"] --- C1["site-c-server<br/>K3s server + etcd"] & C2["site-c-agent<br/>K3s agent"]
+    end
+    RA <-->|WireGuard| RB
+    RB <-->|WireGuard| RC
+    RA <-->|WireGuard| RC
+    WAN --- RA & RB & RC
+  end
+  subgraph K8S["Kubernetes workloads (spread across sites)"]
+    APP["SitePulse x3"] --> REDIS["Redis + PersistentVolume"]
+    TR["Traefik ingress x2"] --> APP
+    PROM["Prometheus + kube-state-metrics"]
+  end
+  EDGE -.->|"ingress :80 / API :6443"| K8S

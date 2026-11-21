@@ -1,0 +1,28 @@
+%% Kubernetes architecture: HA control plane and workload placement
+flowchart TB
+  subgraph CP["Control plane: 3 K3s servers, embedded etcd (Raft quorum = 2 of 3)"]
+    SA["site-a-server<br/>API, scheduler, controllers<br/>etcd member"]
+    SB["site-b-server<br/>API, scheduler, controllers<br/>etcd member"]
+    SC["site-c-server<br/>API, scheduler, controllers<br/>etcd member"]
+    SA <-->|"etcd peer 2380"| SB <-->|"etcd peer 2380"| SC <-->|"etcd peer 2380"| SA
+  end
+  LB["edge HAProxy :6443<br/>TCP health checks"] --> SA & SB & SC
+  KC["kubectl (VM or Windows)"] --> LB
+  subgraph W["Workers"]
+    AA["site-a-agent"]; AB["site-b-agent"]; AC["site-c-agent"]
+  end
+  AA & AB & AC -->|"register via edge, then<br/>client-side LB to all servers"| CP
+  subgraph NS1["namespace sitepulse (PSA restricted, default-deny NetworkPolicy)"]
+    D["Deployment sitepulse<br/>3 replicas, zone spread, PDB minAvailable 2"]
+    SVC["Service sitepulse"] --> D
+    ING["Ingress sitepulse.lab.internal<br/>+ retry middleware"] --> SVC
+    RS["StatefulSet redis<br/>PVC 256Mi local-path"]
+    D -->|"redis.sitepulse.svc"| RS
+  end
+  subgraph NS2["namespace monitoring"]
+    P["Prometheus"] ; KSM["kube-state-metrics"]
+  end
+  subgraph KS["kube-system"]
+    T["Traefik x2 (ServiceLB on every node :80)"]; DNSK["CoreDNS x3"]; MS["metrics-server"]; LP["local-path provisioner"]
+  end
+  T --> ING
